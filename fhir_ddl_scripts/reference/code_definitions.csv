@@ -1,0 +1,55 @@
+domain,code_field,code_value,display_name,description
+common,sts,A,Active,Resource is currently active and in use
+common,sts,C,Completed,Resource has been completed
+common,sts,F,Final,Resource is finalized and no further changes expected
+common,sts,I,Inactive,Resource is no longer active
+common,sts,S,Superseded,Resource has been replaced by a newer version
+common,sts,V,Available,Resource is available for use
+common,gndr,M,Male,Male gender
+common,gndr,F,Female,Female gender
+common,gndr,O,Other,Other gender
+common,gndr,U,Unknown,Unknown gender
+clinical,cln_sts_cd,A,Active,Condition is currently active
+clinical,cln_sts_cd,R,Recurrence,Condition has recurred
+clinical,cln_sts_cd,RL,Relapse,Condition has relapsed
+clinical,cln_sts_cd,IA,Inactive,Condition is no longer active
+clinical,cln_sts_cd,RE,Remission,Condition is in remission
+clinical,cln_sts_cd,RS,Resolved,Condition has been resolved
+clinical,vrf_sts_cd,U,Unconfirmed,Condition has not been confirmed
+clinical,vrf_sts_cd,P,Provisional,Condition is provisionally diagnosed
+clinical,vrf_sts_cd,D,Differential,Condition is a differential diagnosis
+clinical,vrf_sts_cd,C,Confirmed,Condition has been confirmed
+clinical,vrf_sts_cd,R,Refuted,Condition has been refuted
+clinical,vrf_sts_cd,E,Entered-in-error,Condition was entered in error
+allergy,typ,AL,Allergy,Immune-mediated adverse reaction
+allergy,typ,IT,Intolerance,Non-immune-mediated adverse reaction
+allergy,crt,L,Low,Low criticality
+allergy,crt,H,High,High criticality
+allergy,crt,UC,Unable-to-assess,Unable to assess criticality
+allergy,ctg,FD,Food,Food allergy or intolerance
+allergy,ctg,MD,Medication,Medication allergy or intolerance
+allergy,ctg,EN,Environment,Environmental allergy or intolerance
+allergy,ctg,BL,Biologic,Biologic allergy or intolerance
+medication,int,O,Order,Medication order
+medication,int,P,Plan,Medication plan
+medication,int,PR,Proposal,Medication proposal
+careplan,int,O,Order,Care plan order
+careplan,int,P,Plan,Care plan plan
+careplan,int,PR,Proposal,Care plan proposal
+financial,use_cd,CL,Claim,Insurance claim
+financial,use_cd,PA,Pre-authorization,Pre-authorization request
+financial,use_cd,PD,Pre-determination,Pre-determination request
+financial,outc,Q,Queued,Claim is queued for processing
+financial,outc,CP,Complete,Claim processing is complete
+financial,outc,PE,Partial,Claim has been partially processed
+financial,outc,ER,Error,Claim processing encountered an error
+document,doc_sts,P,Preliminary,Document is preliminary
+document,doc_sts,F,Final,Document is finalized
+document,doc_sts,A,Amended,Document has been amended
+document,doc_sts,EE,Entered-in-error,Document was entered in error
+encounter,cls_cd,AMB,Ambulatory,Outpatient visit
+encounter,cls_cd,EMER,Emergency,Emergency department visit
+encounter,cls_cd,IMP,Inpatient,Inpatient hospitalization
+encounter,cls_cd,VR,Virtual,Virtual/telehealth encounter
+immunization,pry_src,Y,Yes,Information is from primary source
+immunization,pry_src,N,No,Information is not from primary source

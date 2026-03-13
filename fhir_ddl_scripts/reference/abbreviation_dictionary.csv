@@ -1,0 +1,127 @@
+abbreviation,full_name,category,description
+abc,ABC Corp,org,Organization prefix
+rid,Resource ID,identifier,Unique resource identifier (Primary Key)
+rtp,Resource Type,identifier,FHIR resource type classification
+sts,Status,common,Current status of the resource
+gndr,Gender,demographic,Administrative gender
+idn,Identifier,common,External identifier
+sys,System,coding,Code system URI
+val,Value,coding,Code value within the system
+cd,Code,coding,Coded concept
+dsp,Display,coding,Human-readable display text
+txt,Text,coding,Free-text description
+ref,Reference,reference,Reference to another resource
+sbj,Subject,reference,Patient/subject reference
+evt,Event,reference,Encounter/event reference
+prf,Professional,reference,Practitioner reference
+org,Organization,reference,Organization reference
+loc,Location,reference,Location reference
+req,Request,reference,Request/order reference
+ctx,Context,reference,Context reference (encounter)
+tgt,Target,reference,Target resource reference
+nm,Name,demographic,Name field
+fam,Family,demographic,Family/last name
+gvn,Given,demographic,Given/first name
+pfx,Prefix,demographic,Name prefix (Dr. etc)
+sfx,Suffix,demographic,Name suffix (Jr. etc)
+bth,Birth,demographic,Birth-related field
+dcd,Deceased,demographic,Deceased-related field
+mrt,Marital,demographic,Marital status
+mlt,Multiple,demographic,Multiple birth indicator
+addr,Address,contact,Address field
+ln1,Line 1,contact,Address line 1
+ln2,Line 2,contact,Address line 2
+cty,City,contact,City
+st,State,contact,State/province
+zip,Zip,contact,Postal/zip code
+ctr,Country,contact,Country
+tlc,Telecom,contact,Telecommunication contact
+lng,Language,demographic,Language code
+pos,Position,location,Geographic position
+lat,Latitude,location,Latitude coordinate
+lng_coord,Longitude,location,Longitude coordinate
+actv,Active,common,Active indicator
+ind,Indicator,common,Boolean indicator
+dts,DateTime Stamp,temporal,Timestamp field
+dt,Date,temporal,Date field
+prd,Period,temporal,Time period
+ed,End,temporal,End of period
+crt,Created,temporal,Creation timestamp
+upd,Updated,temporal,Update timestamp
+eff,Effective,temporal,Effective date/time
+iss,Issued,temporal,Issued date/time
+ath,Authored,temporal,Authored date/time
+rec,Recorded,temporal,Recorded date/time
+occ,Occurrence,temporal,Occurrence date/time
+ons,Onset,temporal,Onset date/time
+abd,Abatement,temporal,Abatement date/time
+std,Started,temporal,Started date/time
+exp,Expiration,temporal,Expiration date
+prf_dt,Performed,temporal,Performed date/time
+cln,Clinical,clinical,Clinical status
+vrf,Verification,clinical,Verification status
+ctg,Category,classification,Category classification
+typ,Type,classification,Type classification
+cls,Class,classification,Encounter class
+spc,Specialty,classification,Medical specialty
+intnt,Intent,classification,Request intent
+rx,Prescription,medication,Medication/prescription
+med,Medication,medication,Medication reference
+dos,Dosage,medication,Dosage information
+qty,Quantity,measurement,Quantity value
+unt,Unit,measurement,Unit of measure
+rte,Route,medication,Administration route
+frm,Form,medication,Medication form
+mfr,Manufacturer,device,Manufacturer
+mdl,Model,device,Model number
+vrs,Version,device,Version
+srl,Serial,device,Serial number
+lot,Lot,device,Lot number
+num,Number,measurement,Numeric count
+srs,Series,imaging,Imaging series
+ins,Instance,imaging,Imaging instance
+rfr,Referrer,reference,Referring practitioner
+itp,Interpreter,reference,Interpreting practitioner
+vac,Vaccine,immunization,Vaccine code
+ste,Site,immunization,Administration site
+pry,Priority,common,Priority level
+src,Source,common,Source indicator
+rsn,Reason,clinical,Reason code
+cnc,Conclusion,clinical,Clinical conclusion
+sec,Security,document,Security classification
+cnt,Content,document,Content/attachment
+att,Attachment,document,Attachment details
+hsh,Hash,document,Content hash
+sz,Size,document,Content size
+ttl,Title,document,Title
+url,URL,document,URL/location
+agt,Agent,audit,Audit agent
+bhf,On-behalf-of,audit,Acting on behalf of
+act,Activity,audit,Audit activity
+fin,Financial,financial,Financial domain
+clm,Claim,financial,Insurance claim
+eob,Explanation of Benefit,financial,Explanation of benefit
+prv,Provider,financial,Provider reference
+tot,Total,financial,Total amount
+amt,Amount,financial,Monetary amount
+cur,Currency,financial,Currency code
+pmt,Payment,financial,Payment information
+prs,Prescription,financial,Prescription reference
+sup,Supply,supply,Supply/delivery
+itm,Item,supply,Supply item
+dlv,Delivery,supply,Delivery
+dst,Destination,supply,Destination reference
+mng,Managing,reference,Managing organization
+svc,Service,reference,Service provider
+bool,Boolean,common,Boolean indicator value
+cst,Cost,financial,Cost amount
+dnm,Denominator,measurement,Denominator value
+doc,Document,document,Document-related field
+dsc,Description,common,Description text
+outc,Outcome,financial,Claim processing outcome
+prc,Procedure,clinical,Procedure reference
+seq,Sequence,common,Sequence number
+str,String,common,String value representation
+use,Use,financial,Use/purpose code
+who,Who,reference,Who reference (agent/actor)
+modl,Modality,classification,Imaging/location modality

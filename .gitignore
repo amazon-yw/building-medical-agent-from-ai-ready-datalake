@@ -1,0 +1,23 @@
+# cdk
+cdk/*.swp
+cdk/package-lock.json
+cdk/__pycache__
+cdk/.pytest_cache
+cdk/.venv
+cdk/*.egg-info
+cdk/.cdk.staging
+cdk/cdk.out
+
+hcls-data-lake-workshop-build
+building-medical-agent-from-ai-ready-datalake
+
+# notes.md
+# prompt.md
+
+# Python
+__pycache__/
+*.pyc
+*.so
+
+# Lambda layers
+cdk/lambda_layers/

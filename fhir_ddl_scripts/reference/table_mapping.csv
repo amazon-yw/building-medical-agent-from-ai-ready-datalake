@@ -1,0 +1,25 @@
+domain,fhir_resource,table_name,table_description
+reg,Patient,abc_reg_ptnt,Patient Registry
+reg,Practitioner,abc_reg_prct,Practitioner Registry
+reg,Organization,abc_reg_orgz,Organization Registry
+reg,Location,abc_reg_lctn,Location Registry
+reg,PractitionerRole,abc_reg_prol,Practitioner Role
+cln,Encounter,abc_cln_enct,Clinical Encounter
+cln,Condition,abc_cln_cond,Clinical Condition/Diagnosis
+cln,Procedure,abc_cln_prcd,Clinical Procedure
+cln,Observation,abc_cln_obsv,Clinical Observation/Measurement
+rx,Medication,abc_rx_mdcn,Medication Catalog
+rx,MedicationRequest,abc_rx_mreq,Medication Request/Order
+rx,MedicationAdministration,abc_rx_madm,Medication Administration
+dgn,DiagnosticReport,abc_dgn_drpt,Diagnostic Report
+dgn,ImagingStudy,abc_dgn_imgs,Imaging Study
+dgn,Immunization,abc_dgn_imzn,Immunization Record
+dgn,AllergyIntolerance,abc_dgn_algy,Allergy/Intolerance Record
+car,CarePlan,abc_car_cpln,Care Plan
+car,CareTeam,abc_car_ctm,Care Team
+car,Device,abc_car_devc,Device Catalog
+car,SupplyDelivery,abc_car_sdlv,Supply Delivery
+fin,Claim,abc_fin_clam,Financial Claim
+fin,ExplanationOfBenefit,abc_fin_eob,Explanation of Benefit
+doc,DocumentReference,abc_doc_dref,Document Reference
+doc,Provenance,abc_doc_prvn,Provenance/Audit Track
