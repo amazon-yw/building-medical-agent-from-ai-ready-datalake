@@ -80,7 +80,7 @@ class FhirDataStack(Stack):
         # 2. Upload NDJSON files
         s3deploy.BucketDeployment(
             self, "DeployNdjsonFiles",
-            sources=[s3deploy.Source.asset("/Users/yunwoo/Projects/hcls_data_lake_workshop/fhir_data/fhir")],
+            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../fhir_data/fhir"))],
             destination_bucket=bucket,
             destination_key_prefix="data/raw/",
             memory_limit=1024,
