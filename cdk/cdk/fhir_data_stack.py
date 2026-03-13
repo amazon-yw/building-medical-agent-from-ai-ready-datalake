@@ -90,7 +90,7 @@ class FhirDataStack(Stack):
         # 3. Upload SQL files
         s3deploy.BucketDeployment(
             self, "DeploySqlFiles",
-            sources=[s3deploy.Source.asset("/Users/yunwoo/Projects/hcls_data_lake_workshop/fhir_ddl_scripts/v2")],
+            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../fhir_ddl_scripts/v2"))],
             destination_bucket=bucket,
             destination_key_prefix="scripts/ddl/",
             exclude=["*.md"]
@@ -1199,6 +1199,11 @@ def handler(event, context):
         # Lake Formation
         code_editor_role.add_to_policy(iam.PolicyStatement(
             actions=["lakeformation:*"],
+            resources=["*"]
+        ))
+        # EMR Serverless
+        code_editor_role.add_to_policy(iam.PolicyStatement(
+            actions=["emr-serverless:*"],
             resources=["*"]
         ))
         # Secrets Manager read for DB credentials
