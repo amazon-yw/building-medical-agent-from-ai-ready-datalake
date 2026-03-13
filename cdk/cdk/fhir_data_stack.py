@@ -1206,6 +1206,14 @@ def handler(event, context):
             actions=["emr-serverless:*"],
             resources=["*"]
         ))
+        # CDK deploy permissions
+        code_editor_role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name("PowerUserAccess")
+        )
+        code_editor_role.add_to_policy(iam.PolicyStatement(
+            actions=["iam:*"],
+            resources=["*"]
+        ))
         # Secrets Manager read for DB credentials
         db_cluster.secret.grant_read(code_editor_role)
 

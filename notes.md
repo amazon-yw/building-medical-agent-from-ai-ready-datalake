@@ -415,7 +415,7 @@ Welcome to Kiro CLI, let's get you signed in!
 Press enter to continue to the browser or esc to cancel
 ```
 
-
+- git clone https://github.com/amazon-yw/building-medical-agent-from-ai-ready-datalake.git
 
 ### LAB-1
 - [Glue Crawler] Job Run 하여 PostgreSQL 데이터베이스에 대한 데이터 카탈로그 생성
