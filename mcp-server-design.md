@@ -164,10 +164,10 @@ Agent:
 > 의사가 오전 외래 시작 전, 오늘 예약된 당뇨 환자의 상태를 빠르게 파악하는 상황
 
 ```
-의사: "오늘 외래에 당뇨 진단받은 60대 환자가 있는데, 목록 좀 보여줘"
+의사: "외래에 당뇨 진단받은 50대 환자가 있는데, 목록 좀 보여줘."
    → search_patients(condition_code="diabetes", age_range="60-69")
 
-의사: "이 중 김OO 환자 상태 요약해줘"
+의사: "이 중 Jarrod Orti 환자 상태 요약해줘."
    → get_patient_summary(patient_id="xxx")
 
 의사: "이 환자 최근 혈당 수치 추이가 어떻게 돼?"
@@ -185,10 +185,12 @@ Agent:
 > 담당의가 병동 회진 전, 입원 환자의 경과와 투약 현황을 확인하는 상황
 
 ```
-의사: "현재 입원 중인 환자 중 이OO 환자 진단 이력 보여줘"
+의사: "최근 입원했던 환자 목록 좀 보여줘."
+
+의사: "최근 입원했던 환자 중 Dorethea Koss 환자 진단 이력 보여줘."
    → get_diagnosis_history(patient_id="xxx")
 
-의사: "이 환자한테 투여 중인 약물이랑 투약 기록 확인해줘"
+의사: "이 환자한테 투여 중인 약물이랑 투약 기록 확인해줘."
    → get_medications(patient_id="xxx")
 
 의사: "최근 검사 결과 중 이상 소견 있는 거 있어?"
@@ -206,7 +208,7 @@ Agent:
 의사: "이 환자 예방접종이나 정기 검진 중 빠진 거 있어?"
    → detect_care_gaps(patient_id="xxx")
 
-의사: "이 환자 과거 접종 이력 전체 보여줘"
+의사: "이 환자 과거 접종 이력 전체 보여줘."
    → get_clinical_observations(patient_id="xxx", observation_code="immunization")
 
 의사: "같은 연령대 환자들의 당뇨 유병률은 어느 정도야?"
@@ -218,7 +220,7 @@ Agent:
 > 원무과 직원이나 담당의가 환자의 청구 현황을 확인하는 상황
 
 ```
-직원: "이 환자의 최근 보험 청구 현황 보여줘"
+직원: "이 환자의 최근 보험 청구 현황 보여줘."
    → get_claim_summary(patient_id="xxx")
 
 직원: "미결제 건이 있나?"
@@ -235,7 +237,7 @@ Agent:
    → get_table_schema("medication_request")
    → run_custom_query("SELECT medication_code_display, COUNT(*) ...")
 
-의사: "작년에 응급실 재방문율이 높은 환자군 특성이 궁금한데"
+의사: "작년에 응급실 재방문율이 높은 환자군 특성이 궁금한데..."
    → list_tables(domain="clinical")
    → get_table_schema("clinical_encounter")
    → get_table_relationships("clinical_encounter")

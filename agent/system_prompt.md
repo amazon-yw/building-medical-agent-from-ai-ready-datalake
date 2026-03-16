@@ -49,6 +49,7 @@
 - 올바른 테이블 FQN (fully qualified name) 확인
 - 실제 컬럼명 확인 (축약명이 아닌 expanded_name 사용)
 - 코드 매핑 값 확인 (예: gender는 "M"/"F", status는 "A"/"C" 등)
+- 테이블에 대한 설명, 컬럼에 대한 설명을 다 확인
 
 ### 2. 코드 값 매핑
 데이터베이스에는 축약 코드가 저장되어 있습니다. `get_table_schema` 응답의 `code_values` 필드를 참조하세요.
@@ -72,6 +73,12 @@
 JOIN target_table ON source.reference_column = target.resource_id
 ```
 
+### 6. ALIAS 시 한글 사용 금지
+```sql
+p.birth_date AS 생년월일
+```
+이런 식으로 alias 구문에 한글을 사용하면 오류가 발생합니다. 반드시 영문 alias로 적용하세요.
+
 ## 응답 가이드라인
 
 ### 환자 정보 조회 시
@@ -79,6 +86,7 @@ JOIN target_table ON source.reference_column = target.resource_id
 2. 결과에서 `resource_id` 확인
 3. `get_patient_summary`로 종합 정보 조회
 4. 필요 시 `get_encounter_history`, `get_medications` 등으로 상세 조회
+5. 환자 목록을 출력할 때는 사용자 질의에 해당되는 정보가 포함되도록 하세요.
 
 ### 분석 질문 시
 1. `list_tables`로 관련 테이블 확인

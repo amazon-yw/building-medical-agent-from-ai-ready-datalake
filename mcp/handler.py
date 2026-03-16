@@ -34,8 +34,19 @@ def handler(event, context):
     """AgentCore Gateway invokes this Lambda with tool name and arguments."""
     logger.info(f"Event: {json.dumps(event)}")
 
-    tool_name = event.get("toolName") or event.get("tool_name") or event.get("name")
-    arguments = event.get("arguments") or event.get("input") or {}
+    # Gateway passes tool name in client_context.custom
+    tool_name = None
+    if hasattr(context, 'client_context') and context.client_context:
+        custom = getattr(context.client_context, 'custom', {}) or {}
+        gw_tool = custom.get('bedrockAgentCoreToolName', '')
+        # Strip target prefix: "FhirMcpLambdaTarget___list_tables" -> "list_tables"
+        tool_name = gw_tool.split('___', 1)[-1] if '___' in gw_tool else gw_tool
+
+    # Fallback to event keys
+    if not tool_name:
+        tool_name = event.get("toolName") or event.get("tool_name") or event.get("name")
+
+    arguments = event  # Gateway sends arguments as the event itself
 
     if isinstance(arguments, str):
         arguments = json.loads(arguments)

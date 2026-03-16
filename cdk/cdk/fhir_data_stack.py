@@ -1255,7 +1255,7 @@ def handler(event, context):
                 device_name="/dev/xvda",
                 volume=ec2.BlockDeviceVolume.ebs(40, volume_type=ec2.EbsDeviceVolumeType.GP3, encrypted=True)
             )],
-            user_data=ec2.UserData.custom(f"#!/bin/bash\nmkdir -p {home_folder} && chown -R {code_editor_user}:{code_editor_user} {home_folder}\nhostname CodeEditor\n"),
+            user_data=ec2.UserData.custom(f"#!/bin/bash\nmkdir -p {home_folder} && chown -R {code_editor_user}:{code_editor_user} {home_folder}\nhostname CodeEditor\ndnf install -y python3.12 python3.12-pip\n"),
         )
         code_editor_instance.instance.add_property_override("Tags", [{"Key": "Name", "Value": "CodeEditor"}])
 

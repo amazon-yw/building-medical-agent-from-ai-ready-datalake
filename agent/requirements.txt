@@ -1,0 +1,7 @@
+bedrock-agentcore
+strands-agents[otel]
+strands-agents-tools
+mcp
+httpx
+aws-opentelemetry-distro
+streamlit

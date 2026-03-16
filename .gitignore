@@ -24,3 +24,4 @@ cdk/lambda_layers/
 
 # generated temp files
 notebooks/connection_info.json
+notebooks/agent_info.json
