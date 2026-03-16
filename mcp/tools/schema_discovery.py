@@ -1,83 +1,98 @@
 """Schema discovery tools: list_tables, get_table_schema, get_table_relationships"""
-from emr_client import execute_spark_code
-
-CATALOG = "s3tablescatalog"
-DB = "fhir-bucket.data"
-
-DOMAIN_MAP = {
-    "administrative": ["patient_registry", "practitioner_registry", "organization_registry", "location_registry", "practitioner_role"],
-    "clinical": ["clinical_encounter", "clinical_condition", "clinical_procedure", "clinical_observation"],
-    "medication": ["medication_catalog", "medication_request", "medication_administration"],
-    "diagnostic": ["diagnostic_report", "imaging_study", "immunization_record", "allergy_intolerance"],
-    "care": ["care_plan", "care_team", "device_catalog", "supply_delivery"],
-    "financial": ["financial_claim", "explanation_of_benefit"],
-    "document": ["document_reference", "provenance_audit"],
-}
+import json
+from metadata_loader import (
+    get_domain_map, get_all_tables, get_table_info, get_column_map,
+    fqn, CATALOG, DB, CODE_MAPS, find_patient_ref_column,
+)
 
 
 def list_tables(domain: str = None) -> list[dict]:
-    """List available tables with metadata from TBLPROPERTIES and COMMENT."""
-    tables = []
-    if domain and domain.lower() in DOMAIN_MAP:
-        tables = DOMAIN_MAP[domain.lower()]
+    """List available tables with metadata and query hints for AI agents."""
+    domain_map = get_domain_map()
+    if domain and domain.lower() in domain_map:
+        tables = domain_map[domain.lower()]
     else:
-        for t_list in DOMAIN_MAP.values():
-            tables.extend(t_list)
+        tables = get_all_tables()
 
-    code = f"""
-import json
-results = []
-for table in {tables}:
-    try:
-        props = spark.sql(f"SHOW TBLPROPERTIES `{CATALOG}`.`{DB}`.{{table}}").collect()
-        prop_dict = {{r['key']: r['value'] for r in props}}
-        desc = spark.sql(f"DESCRIBE TABLE EXTENDED `{CATALOG}`.`{DB}`.{{table}}").collect()
-        comment = ''
-        for r in desc:
-            if r['col_name'] == 'Comment' or r['col_name'] == '# Detailed Table Information':
-                continue
-            if r['data_type'] and r['data_type'].startswith('Table Comment:'):
-                comment = r['data_type'].replace('Table Comment:', '').strip()
-        results.append({{'table': table, 'domain': prop_dict.get('domain', ''), 'fhir_resource': prop_dict.get('fhir_resource', ''), 'comment': comment}})
-    except Exception as e:
-        results.append({{'table': table, 'error': str(e)}})
-print(json.dumps(results))
-"""
-    return execute_spark_code(code)
+    results = []
+    for t in tables:
+        info = get_table_info(t)
+        cols = info.get("columns", {})
+        column_names = [c.get("expanded_name", "") for c in cols.values()]
+        results.append({
+            "table": t,
+            "fqn": fqn(t),
+            "domain": info.get("domain", ""),
+            "fhir_resource": info.get("fhir_resource", ""),
+            "description": info.get("description", ""),
+            "column_count": info.get("column_count", 0),
+            "columns": column_names,
+        })
+
+    return json.dumps({
+        "query_hints": {
+            "catalog": CATALOG,
+            "namespace": DB,
+            "fqn_format": f"`{CATALOG}`.`{DB}`.`<table_name>`",
+            "note": "Always use backtick-quoted fully qualified names. Column names in the tables are the expanded_name values listed below, NOT abbreviated names.",
+        },
+        "tables": results,
+    })
 
 
 def get_table_schema(table_name: str) -> str:
-    """Get detailed table schema with column comments from DESCRIBE TABLE EXTENDED."""
-    code = f"""
-import json
-rows = spark.sql("DESCRIBE TABLE EXTENDED `{CATALOG}`.`{DB}`.{table_name}").collect()
-cols = []{{'name': r['col_name'], 'type': r['data_type'], 'comment': r['comment'] or ''}} for r in rows if r['col_name'] and not r['col_name'].startswith('#')]
-props = spark.sql("SHOW TBLPROPERTIES `{CATALOG}`.`{DB}`.{table_name}").collect()
-prop_dict = {{r['key']: r['value'] for r in props}}
-print(json.dumps({{'columns': cols, 'properties': prop_dict}}))
-"""
-    return execute_spark_code(code)
+    """Get detailed table schema with column info, code mappings, and query hints."""
+    info = get_table_info(table_name)
+    if not info:
+        return json.dumps({"error": f"Table '{table_name}' not found in metadata"})
+
+    patient_ref = find_patient_ref_column(table_name)
+    cols = []
+    for abbr, col_info in info.get("columns", {}).items():
+        expanded = col_info.get("expanded_name", abbr)
+        col_entry = {
+            "column_name": expanded,
+            "data_type": col_info.get("data_type", ""),
+            "description": col_info.get("description", ""),
+            "semantic_category": col_info.get("semantic_category", ""),
+            "nullable": col_info.get("nullable", True),
+        }
+        if col_info.get("references_table"):
+            col_entry["references_table"] = col_info["references_table"]
+        # Include code mappings if this column has coded values
+        if expanded in CODE_MAPS:
+            col_entry["code_values"] = CODE_MAPS[expanded]
+        cols.append(col_entry)
+
+    return json.dumps({
+        "table": table_name,
+        "fqn": fqn(table_name),
+        "domain": info.get("domain", ""),
+        "fhir_resource": info.get("fhir_resource", ""),
+        "description": info.get("description", ""),
+        "patient_reference_column": patient_ref,
+        "query_example": f"SELECT * FROM {fqn(table_name)} LIMIT 10",
+        "columns": cols,
+    })
 
 
 def get_table_relationships(table_name: str = None) -> str:
-    """Infer table relationships from _reference suffix columns."""
-    tables = [table_name] if table_name else []
-    if not tables:
-        for t_list in DOMAIN_MAP.values():
-            tables.extend(t_list)
-
-    code = f"""
-import json
-results = []
-for table in {tables}:
-    rows = spark.sql(f"DESCRIBE TABLE EXTENDED `{CATALOG}`.`{DB}`.{{table}}").collect()
-    refs = []
-    for r in rows:
-        if r['col_name'] and r['col_name'].endswith('_reference'):
-            target = r['col_name'].replace('_reference', '').replace('subject', 'patient_registry').replace('patient', 'patient_registry').replace('encounter', 'clinical_encounter').replace('practitioner', 'practitioner_registry').replace('organization', 'organization_registry').replace('location', 'location_registry')
-            refs.append({{'column': r['col_name'], 'comment': r['comment'] or '', 'inferred_target': target}})
-    if refs:
-        results.append({{'table': table, 'references': refs}})
-print(json.dumps(results))
-"""
-    return execute_spark_code(code)
+    """Get table relationships from metadata reference columns."""
+    tables = [table_name] if table_name else get_all_tables()
+    results = []
+    for t in tables:
+        cols = get_column_map(t)
+        refs = []
+        for abbr, col_info in cols.items():
+            if col_info.get("references_table"):
+                expanded = col_info.get("expanded_name", abbr)
+                target = col_info["references_table"]
+                refs.append({
+                    "column": expanded,
+                    "references_table": target,
+                    "references_fqn": fqn(target),
+                    "join_hint": f"JOIN {fqn(target)} ON `{expanded}` = {fqn(target)}.`resource_id`",
+                })
+        if refs:
+            results.append({"table": t, "fqn": fqn(t), "references": refs})
+    return json.dumps(results)

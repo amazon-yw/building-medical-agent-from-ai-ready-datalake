@@ -995,6 +995,18 @@ def handler(event, context):
                     "Memory": "3000 GB",
                     "Disk": "20000 GB"
                 },
+                "RuntimeConfiguration": [
+                    {
+                        "Classification": "spark-defaults",
+                        "Properties": {
+                            "spark.jars.packages": "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
+                            "spark.sql.catalog.s3tablescatalog": "org.apache.iceberg.spark.SparkCatalog",
+                            "spark.sql.catalog.s3tablescatalog.catalog-impl": "software.amazon.s3tables.iceberg.S3TablesCatalog",
+                            "spark.sql.catalog.s3tablescatalog.warehouse": f"arn:aws:s3tables:{self.region}:{self.account}:bucket/fhir-bucket",
+                            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+                        }
+                    }
+                ],
             }
         )
 
@@ -1280,6 +1292,10 @@ def handler(event, context):
                                 # AWS CLI
                                 f"sudo -u {code_editor_user} curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip -o /tmp/aws-cli.zip",
                                 "unzip -q -d /tmp /tmp/aws-cli.zip && /tmp/aws/install && rm -rf /tmp/aws",
+                                # Node.js 22 LTS, pip, AWS CDK
+                                "curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -",
+                                "dnf install -y nodejs python3-pip",
+                                "npm install -g aws-cdk",
                                 # Git config
                                 f'sudo -u {code_editor_user} git config --global user.email "participant@example.com"',
                                 f'sudo -u {code_editor_user} git config --global user.name "Workshop Participant"',

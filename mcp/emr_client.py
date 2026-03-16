@@ -5,7 +5,7 @@ import time
 import logging
 
 import botocore.session
-from botocore import crt
+from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 import requests
 
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 APPLICATION_ID = os.environ["EMR_APPLICATION_ID"]
 EXECUTION_ROLE_ARN = os.environ["EMR_EXECUTION_ROLE_ARN"]
+ACCOUNT_ID = EXECUTION_ROLE_ARN.split(":")[4]
 ENDPOINT = f"https://{APPLICATION_ID}.livy.emr-serverless-services.{REGION}.amazonaws.com"
 HEADERS = {"Content-Type": "application/json"}
 
@@ -23,19 +24,19 @@ _session_id = None
 
 def _get_signer():
     session = botocore.session.Session()
-    return crt.auth.CrtS3SigV4Auth(session.get_credentials(), "emr-serverless", REGION)
+    return SigV4Auth(session.get_credentials(), "emr-serverless", REGION)
 
 
 def _signed_request(method, url, data=None):
     signer = _get_signer()
-    req = AWSRequest(method=method, url=url, data=json.dumps(data) if data else None, headers=HEADERS)
-    req.context["payload_signing_enabled"] = False
+    body = json.dumps(data) if data else None
+    req = AWSRequest(method=method, url=url, data=body, headers=HEADERS)
     signer.add_auth(req)
     prepped = req.prepare()
     fn = getattr(requests, method.lower())
     kwargs = {"headers": prepped.headers}
-    if data:
-        kwargs["data"] = json.dumps(data)
+    if body:
+        kwargs["data"] = body
     return fn(prepped.url, **kwargs)
 
 
@@ -50,20 +51,32 @@ def _get_or_create_session():
             return _session_id
         _session_id = None
 
-    # Try to find an existing idle session
+    # Reuse existing idle pyspark session or clean up incompatible ones
     r = _signed_request("GET", f"{ENDPOINT}/sessions")
     if r.status_code == 200:
         for s in r.json().get("sessions", []):
-            if s.get("state") == "idle":
+            if s.get("state") == "idle" and s.get("kind") == "pyspark":
                 _session_id = s["id"]
                 logger.info(f"Reusing existing session {_session_id}")
                 return _session_id
+            elif s.get("state") in ("idle", "busy"):
+                _signed_request("DELETE", f"{ENDPOINT}/sessions/{s['id']}")
+                logger.info(f"Deleted session {s['id']}")
 
     # Create new session
     data = {
-        "kind": "sql",
+        "kind": "pyspark",
         "heartbeatTimeoutInSecond": 600,
-        "conf": {"emr-serverless.session.executionRoleArn": EXECUTION_ROLE_ARN},
+        "conf": {
+            "emr-serverless.session.executionRoleArn": EXECUTION_ROLE_ARN,
+            "spark.jars.packages": "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
+            "spark.sql.catalog.s3tablescatalog": "org.apache.iceberg.spark.SparkCatalog",
+            "spark.sql.catalog.s3tablescatalog.catalog-impl": "software.amazon.s3tables.iceberg.S3TablesCatalog",
+            "spark.sql.catalog.s3tablescatalog.warehouse": f"arn:aws:s3tables:{REGION}:{ACCOUNT_ID}:bucket/fhir-bucket",
+            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+            "spark.driver.extraJavaOptions": "-Dfile.encoding=UTF-8",
+            "spark.executor.extraJavaOptions": "-Dfile.encoding=UTF-8" 
+        },
         "ttl": "2h",
     }
     r = _signed_request("POST", f"{ENDPOINT}/sessions", data)
@@ -106,10 +119,22 @@ def execute_sql(sql: str, timeout: int = 120) -> list[dict]:
             # Parse JSON strings from collect()
             data = output.get("data", {}).get("text/plain", "[]")
             try:
-                rows = json.loads(data.replace("'", '"'))
-                return [json.loads(r) if isinstance(r, str) else r for r in rows]
-            except (json.JSONDecodeError, TypeError):
+                # PySpark collect() returns Python repr: ['{"k":"v"}', ...]
+                # Use ast.literal_eval to safely parse Python literals
+                import ast
+                parsed = ast.literal_eval(data)
+                if isinstance(parsed, list):
+                    return [json.loads(r) if isinstance(r, str) else r for r in parsed]
                 return [{"raw_output": data}]
+            except (ValueError, SyntaxError, json.JSONDecodeError):
+                # Try direct JSON parse as fallback
+                try:
+                    parsed = json.loads(data)
+                    if isinstance(parsed, list):
+                        return parsed
+                    return [parsed]
+                except json.JSONDecodeError:
+                    return [{"raw_output": data}]
         if state in ("error", "cancelled"):
             raise RuntimeError(f"Statement failed: {resp}")
         time.sleep(1)

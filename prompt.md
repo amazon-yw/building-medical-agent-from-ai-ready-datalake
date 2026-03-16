@@ -5,10 +5,7 @@
 ## [STEP-1] 원본 테이블의 메타데이터 추론
 
 Tables in "AwsDataCatalog.fhir_db" are related with patient data.
-Please create metadata for the tables in "AwsDataCatalog.fhir_db". The reason I'm asking for metadata creation first is that I want to build tables that AI can 
-understand effectively. For AI to work well with the data, comprehensive metadata for each table and column is essential. I'll use this metadata later when creating 
-tables in S3 Tables to build the data lake. Since there are 24 tables in "AwsDataCatalog.fhir_db", the response might be quite huge, so please create the actual Python
-code to generate the comprehensive metadata for making it concise and efficient to avoid any issues. Python code should use "boto3.client('glue')" not pyspark.
+Please create metadata for the tables in "AwsDataCatalog.fhir_db". The reason I'm asking for metadata creation first is that I want to build tables that AI can understand effectively. For AI to work well with the data, comprehensive metadata for each table and column is essential. I'll use this metadata later when creating tables in S3 Tables to build the data lake. Since there are 24 tables in "AwsDataCatalog.fhir_db", the response might be quite huge, so please create the actual Python code to generate the comprehensive metadata for making it concise and efficient to avoid any issues. Python code should use "boto3.client('glue')" not pyspark.
 
 ### Environment Info
 - Region: us-west-2
@@ -22,13 +19,16 @@ code to generate the comprehensive metadata for making it concise and efficient 
 - Column-Level Details: For each of the ~498 columns across 24 tables:
   - Full expanded names (e.g., rid → resource_id, sbj_ref → subject_reference)
   - Detailed descriptions
-  - Semantic categories (identifier, reference, temporal, coding, status, value, demographics, address, financial, dosage, device, document, narrative, etc.)
+  - Semantic categories (identifier, reference, temporal, coding, status, value, demographics, address, financial, dosage, device, document, 
+narrative, etc.)
   - AI-friendly tags for search and discovery
   - Data types and nullability
-- Common abbreviated column patterns should be mapped comprehensively (e.g., _ref suffix → reference, _sys suffix → code system, _cd suffix → code value _dsp suffix → display text, _dts suffix → datetime, _txt suffix → free text)
+- Common abbreviated column patterns should be mapped comprehensively (e.g., ref suffix → reference, sys suffix → code system, cd suffix → code
+value dsp suffix → display text, dts suffix → datetime, txt suffix → free text)
 2. Relationship Mapping
 - Identifies foreign key relationships between tables via reference columns (_ref suffix)
-- Maps reference columns to their target tables (e.g., sbj_ref → patient, evt_ref → encounter, prf_ref → practitioner, org_ref → organization, loc_ref → location, med_ref → medication, clm_ref → claim)
+- Maps reference columns to their target tables (e.g., sbj_ref → patient, evt_ref → encounter, prf_ref → practitioner, org_ref → 
+organization, loc_ref → location, med_ref → medication, clm_ref → claim)
 - Provides JOIN hint strings for analytics queries
 - Enables proper join strategies for analytics
 3. Analytics Hints
@@ -41,14 +41,139 @@ code to generate the comprehensive metadata for making it concise and efficient 
 - field_mappings.json: Quick reference for field abbreviations with cross-table usage tracking
 5. Naming Rule
 - Table name and column name should use snake_case (with underscores) instead of camelCase.
-- For tables and columns where the mapping is difficult to infer, keep the original names as-is and use pattern-based inference from suffixes.
+- For tables and columns where the mapping is difficult to infer, keep the original names as-is and use pattern-based inference from 
+suffixes.
 6. Domain-Based Table Classification (actual table prefix mapping)
 - Administrative
 - Clinical
 - Financial
 - Medication
 - Security
-7. [IMPORTANT] If metadata inference for any table results in "Unknown" fields, the code should automatically retry that table's inference (max 1 retry) before falling back to raw column names.
+7. [IMPORTANT] If metadata inference for any table results in "Unknown" fields, the code should automatically retry that table's inference (
+max 1 retry) before falling back to raw column names.
+
+### [CRITICAL] Output File Schema Specification for MCP Server Integration
+
+The generated fhir_db_metadata.json file is consumed by the MCP server's metadata_loader.py at Lambda cold start. 
+The JSON structure MUST conform to the following schema exactly. Any deviation will break the MCP tool chain.
+
+#### Top-Level Structure
+```json
+{
+  "generated_at": "ISO-8601 timestamp string",
+  "source_database": "fhir_db",
+  "source_catalog": "AwsDataCatalog",
+  "region": "us-west-2",
+  "total_tables": 24,
+  "total_columns": 498,
+  "domains": { ... },
+  "tables": { ... }
+}
+```
+
+#### domains Object
+Keys are domain names with first letter capitalized (e.g., "Clinical", "Administrative", "Financial", "Medication", "Security"). Each value:
+```json
+{
+  "Clinical": {
+    "table_count": 13,
+    "tables": ["encounter", "condition", "observation", "procedure", ...]
+  }
+}
+```
+
+- tables array contains the snake_case table key names (same keys used in the top-level tables object).
+
+#### tables Object
+Keys are snake_case table names (e.g., "encounter", "patient", "medication_request"). Each value:
+```json
+{
+  "original_table_name": "fhir_database_public_abc_enc",
+  "snake_name": "encounter",
+  "fhir_resource": "Encounter",
+  "domain": "Clinical",
+  "sub_domain": "Encounters",
+  "description": "Human-readable table description",
+  "column_count": 17,
+  "columns": { ... }
+}
+```
+
+Required fields per table:
+| Field | Type | Description |
+|---|---|---|
+| original_table_name | string | Original Glue table name |
+| snake_name | string | Normalized snake_case name (same as the key) |
+| fhir_resource | string | FHIR resource type (e.g., "Encounter", "Patient") |
+| domain | string | Domain classification (must match a key in domains) |
+| sub_domain | string | Sub-domain label |
+| description | string | Human-readable description of the table |
+| column_count | integer | Number of columns |
+| columns | object | Column metadata (see below) |
+
+#### columns Object (nested inside each table)
+Keys are the actual abbreviated column names as they exist in the Glue/Athena table (e.g., "sbj_ref", "prd_ed_dts", "rid"). Each value:
+```json
+{
+  "expanded_name": "subject_reference",
+  "description": "Reference to the patient (subject)",
+  "semantic_category": "reference",
+  "tags": ["patient", "subject", "foreign_key"],
+  "references_table": "patient",
+  "original_name": "sbj_ref",
+  "data_type": "string",
+  "nullable": true
+}
+```
+
+Required fields per column:
+| Field | Type | Description |
+|---|---|---|
+| expanded_name | string | Full semantic name in snake_case (e.g., "subject_reference", "period_start_datetime", "resource_id") |
+| description | string | Human-readable column description |
+| semantic_category | string | One of: identifier, reference, temporal, coding, status, value, demographics, address, financial, dosage, 
+device, document, narrative |
+| tags | array of strings | AI-friendly search tags |
+| original_name | string | Original abbreviated column name (same as the key) |
+| data_type | string | Spark/Glue data type (e.g., "string", "timestamp", "double", "bigint") |
+| nullable | boolean | Whether the column is nullable |
+
+Conditional field:
+| Field | Type | When Required |
+|---|---|---|
+| references_table | string | Only for reference columns (semantic_category == "reference"). Value must be a valid key in the top-level 
+tables object (e.g., "patient", "encounter", "practitioner") |
+
+#### Key expanded_name Conventions
+The MCP server's find_column() function looks up columns by expanded_name. The following semantic names MUST be used consistently across all tables where the concept applies:
+
+| Semantic Concept | expanded_name | Typical Abbreviated Pattern |
+|---|---|---|
+| Resource ID | resource_id | rid |
+| Subject/Patient reference | subject_reference | sbj_ref |
+| Patient reference | patient_reference | pat_ref |
+| Encounter reference | encounter_reference | evt_ref, enc_ref |
+| Practitioner reference | practitioner_reference | prf_ref |
+| Organization reference | organization_reference | org_ref |
+| Location reference | location_reference | loc_ref |
+| Status | status | sts, status |
+| Code display | code_display | cd_dsp, code_dsp |
+| Category display | category_display | ctg_dsp |
+| Period start | period_start or period_start_datetime | prd_st_dts |
+| Period end | period_end or period_end_datetime | prd_ed_dts |
+| Effective datetime | effective_datetime | eff_dts |
+| Onset datetime | onset_datetime | ons_dts |
+| Authored datetime | authored_datetime | ath_dts |
+| Birth date | birth_date | bth_dt |
+| Gender | gender | gnd |
+| Name given | name_given | nm_gvn |
+| Name family | name_family | nm_fml |
+| Clinical status | clinical_status or clinical_status_code | cln_sts_cd |
+| Billable period start | billable_period_start | blb_prd_st |
+
+│ **Note**: The abbreviated column names above are examples. The actual abbreviated names vary per workshop participant since they are 
+inferred by AI. What matters is that expanded_name follows the conventions above so the MCP server's find_column() can resolve them 
+correctly.
 
 ### Why This Approach?
 Instead of printing huge amounts of text (which would be overwhelming), the code:

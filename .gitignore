@@ -21,3 +21,6 @@ __pycache__/
 
 # Lambda layers
 cdk/lambda_layers/
+
+# generated temp files
+notebooks/connection_info.json
