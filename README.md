@@ -77,34 +77,6 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 | 레코드 | 450,000+ |
 | 도메인 | Administrative, Clinical, Medication, Diagnostic, Care, Financial/Document |
 
-### Table Mapping
-
-| Domain | FHIR Resource | S3 Tables |
-|--------|--------------|-----------|
-| Administrative | Patient | patient_registry |
-| Administrative | Practitioner | practitioner_registry |
-| Administrative | Organization | organization_registry |
-| Administrative | Location | location_registry |
-| Administrative | PractitionerRole | practitioner_role |
-| Clinical | Encounter | clinical_encounter |
-| Clinical | Condition | clinical_condition |
-| Clinical | Procedure | clinical_procedure |
-| Clinical | Observation | clinical_observation |
-| Medication | Medication | medication_catalog |
-| Medication | MedicationRequest | medication_request |
-| Medication | MedicationAdministration | medication_administration |
-| Diagnostic | DiagnosticReport | diagnostic_report |
-| Diagnostic | ImagingStudy | imaging_study |
-| Diagnostic | Immunization | immunization_record |
-| Diagnostic | AllergyIntolerance | allergy_intolerance |
-| Care | CarePlan | care_plan |
-| Care | CareTeam | care_team |
-| Care | Device | device_catalog |
-| Care | SupplyDelivery | supply_delivery |
-| Financial | Claim | financial_claim |
-| Financial | ExplanationOfBenefit | explanation_of_benefit |
-| Document | DocumentReference | document_reference |
-| Document | Provenance | provenance_audit |
 
 ## MCP Tools (13)
 
@@ -125,6 +97,16 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 | Query | `run_custom_query` | Spark SQL 직접 실행 (SELECT only, LIMIT 100) |
 
 ## Workshop Labs
+
+### Motivation: AI-Assisted Schema Mapping
+
+이 워크샵에서는 레거시 데이터베이스에서 클라우드 데이터 레이크로 마이그레이션할 때, LLM을 활용하여 스키마 매핑과 메타데이터 생성을 자동화할 수 있습니다.
+
+이 워크샵에서는 이 컨셉을 실제로 구현합니다:
+- Aurora PostgreSQL의 축약된 컬럼명(예: `sbj_ref`, `eff_dts`)을 LLM이 분석하여 의미 있는 이름(예: `subject_reference`, `effective_datetime`)으로 확장
+- 각 테이블과 컬럼에 대한 AI 기반 설명(COMMENT), 도메인 분류, 코드 매핑을 자동 생성
+- 생성된 메타데이터를 S3 Tables의 Iceberg 테이블 DDL에 반영하여 AI-Ready Data Lake 구축
+- 이 메타데이터가 이후 MCP 서버의 Schema Discovery 도구와 Agent의 Text-to-SQL에 직접 활용
 
 ### Prerequisites
 - CDK 인프라 배포 (`cdk deploy`)
