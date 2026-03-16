@@ -80,7 +80,7 @@ class FhirDataStack(Stack):
         # 2. Upload NDJSON files
         s3deploy.BucketDeployment(
             self, "DeployNdjsonFiles",
-            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../fhir_data/fhir"))],
+            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../data/fhir"))],
             destination_bucket=bucket,
             destination_key_prefix="data/raw/",
             memory_limit=1024,
@@ -90,7 +90,7 @@ class FhirDataStack(Stack):
         # 3. Upload SQL files
         s3deploy.BucketDeployment(
             self, "DeploySqlFiles",
-            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../fhir_ddl_scripts/v2"))],
+            sources=[s3deploy.Source.asset(os.path.join(os.path.dirname(__file__), "../../data/ddl/v2"))],
             destination_bucket=bucket,
             destination_key_prefix="scripts/ddl/",
             exclude=["*.md"]
