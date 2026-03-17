@@ -100,7 +100,7 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 
 ### Motivation: AI-Assisted Schema Mapping
 
-이 워크샵에서는 레거시 데이터베이스에서 클라우드 데이터 레이크로 마이그레이션할 때, LLM을 활용하여 스키마 매핑과 메타데이터 생성을 자동화할 수 있습니다.
+이 워크샵의 Lab 2는 [Automate schema mappings with LLMs](https://medium.com/road-to-full-stack-data-science/automate-schema-mappings-with-llms-637e55988524) (Tasos Pardalis, 2025)에서 제시한 아이디어에서 영감을 받았습니다. 레거시 데이터베이스에서 클라우드 데이터 레이크로 마이그레이션할 때, LLM을 활용하여 스키마 매핑과 메타데이터 생성을 자동화할 수 있습니다.
 
 이 워크샵에서는 이 컨셉을 실제로 구현합니다:
 - Aurora PostgreSQL의 축약된 컬럼명(예: `sbj_ref`, `eff_dts`)을 LLM이 분석하여 의미 있는 이름(예: `subject_reference`, `effective_datetime`)으로 확장
@@ -108,31 +108,75 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 - 생성된 메타데이터를 S3 Tables의 Iceberg 테이블 DDL에 반영하여 AI-Ready Data Lake 구축
 - 이 메타데이터가 이후 MCP 서버의 Schema Discovery 도구와 Agent의 Text-to-SQL에 직접 활용
 
-### Prerequisites
-- CDK 인프라 배포 (`cdk deploy`)
-- Glue Crawler 실행 → 데이터 카탈로그 생성
-- SageMaker Unified Studio IAM-based Domain 생성
-- Lake Formation 권한 설정 (S3 Tables database)
+### Lab 0 — 인프라 배포 (CDK)
+CDK로 워크샵에 필요한 전체 인프라를 배포합니다.
+1. VPC, Subnets, Security Groups
+2. Aurora PostgreSQL 클러스터 + Synthea FHIR 데이터 로딩
+3. S3 버킷 (데이터, DDL 스크립트, 메타데이터)
+4. S3 Tables 버킷
+5. EMR Serverless Application
+6. Glue Crawler + Data Catalog
+7. EC2 인스턴스 (VS Code Server + JupyterLab)
 
-### Lab 1 — AI-Ready Data Lake 구축
-SageMaker Unified Studio 노트북에서:
-1. Glue Crawler로 Aurora PostgreSQL 데이터 카탈로그 생성
-2. AI 기반 테이블/컬럼 메타데이터 생성 (COMMENT, TBLPROPERTIES)
-3. S3 Tables에 Iceberg 테이블 DDL 생성 및 실행
-4. Aurora → S3 Tables 데이터 마이그레이션
+```bash
+cd cdk
+pip install -r requirements.txt
+cdk deploy
+```
 
-### Lab 2 — MCP 서버 배포
-노트북 `01`, `02`, `03` 순서로 실행:
-1. Lambda MCP 서버 패키징 및 배포 (13개 tool)
-2. AgentCore Gateway + Cognito OAuth 설정
-3. MCP 서버 연동 테스트
+### Lab 1 — 개발 환경 설정 (VS Code Server + Kiro CLI)
+EC2에 프로비저닝된 VS Code Server에 접속하여 개발 환경을 구성합니다.
+1. Cloud Formation의 fhir-data-stack의 output 중 VS Code Server URL 확보
+2. VS Code Server 접속 (`http://<EC2-IP>:8080`)
+3. 워크샵 리포지토리 클론
+4. Kiro CLI 설치 및 인증
+```bash
+curl -fsSL https://cli.kiro.dev/install | bash
+kiro-cli
+```
 
-### Lab 3 — Medical AI Agent 배포
-노트북 `04` 실행:
-1. ECR 리포지토리 생성 + CodeBuild 프로젝트 설정
-2. Strands Agent 컨테이너 빌드 (ARM64)
-3. AgentCore Runtime 배포
-4. Streamlit UI 실행 및 테스트
+### Lab 2 — AI-Ready Data Lake 구축 (Kiro CLI + SageMaker Unified Studio)
+Kiro CLI를 활용하여 레거시 DB의 메타데이터를 LLM으로 추출하고, SageMaker Unified Studio에서 데이터를 마이그레이션합니다.
+
+**Step 1: LLM 기반 메타데이터 생성 (Kiro CLI, VS Code)**
+1. Glue Crawler 실행 → Aurora PostgreSQL 데이터 카탈로그 생성
+2. Kiro CLI에서 LLM을 활용하여 24개 테이블의 메타데이터 자동 생성 
+3. 생성된 메타데이터와 DDL을 S3에 업로드
+> 2, 3번 단계는 prompt.md 파일의 `[STEP-1] 원본 테이블의 메타데이터 추론` 섹션 내 프롬프트를 사용하여 생성합니다.
+
+**Step 2: 데이터 마이그레이션 (SageMaker Unified Studio)**
+1. prompt.md 파일의 `[STEP-2] 생성된 메타데이터로 테이블 생성 노트북 작성` 섹션 내 프롬프트를 사용하여 테이블 생성 노트북 생성.
+2. SageMaker Unified Studio JupyterLab 접속
+3. 1에서 생성된 노트북을 열어 S3 Tables에 Iceberg 테이블 생성
+4. prompt.md 파일의 `[STEP-3] 데이터 마이그레이션 노트북 생성` 섹션 내 프롬프트를 사용하여 데이터 마이그레이션 노트북 생성.
+5. 4에서 생성된 노트북을 열어 Aurora PostgreSQL → S3 Tables 데이터 마이그레이션 (Spark SQL) 
+6. 마이그레이션 데이터 검증
+
+
+### Lab 3 — MCP 서버 배포 (VS Code)
+VS Code에서 노트북을 실행하여 MCP 서버와 관련 리소스를 직접 배포합니다.
+1. Lambda MCP 서버 패키징 및 배포 — 13개 tool (`notebooks/01_deploy_mcp_lambda.ipynb`)
+2. Cognito User Pool + OAuth 클라이언트 설정
+3. AgentCore Gateway + MCP Target 생성 (`notebooks/02_setup_agentcore_gateway.ipynb`)
+4. MCP 서버 연동 테스트 (`notebooks/03_test_mcp_server.ipynb`)
+
+### Lab 4 — Medical AI Agent 배포 (VS Code)
+VS Code에서 노트북을 실행하여 Agent와 관련 리소스를 직접 배포합니다.
+1. ECR 리포지토리 생성
+2. CodeBuild 프로젝트 설정 (ARM64)
+3. Strands Agent 컨테이너 빌드 및 ECR 푸시
+4. AgentCore Runtime 생성 및 배포 (`notebooks/04_deploy_medical_agent.ipynb`)
+
+### Lab 5 — Streamlit UI 실행 및 데모
+Streamlit 채팅 UI를 실행하여 Medical AI Agent를 체험합니다.
+1. EC2에서 Streamlit 앱 실행
+```bash
+AGENT_ARN="<agent-runtime-arn>" AWS_REGION="us-west-2" \
+python3.12 -m streamlit run agent/app.py --server.port 8501 --server.address 0.0.0.0
+```
+2. 브라우저에서 `http://<EC2-IP>:8501` 접속
+3. 사이드바 시나리오 버튼으로 데모 질의 실행
+4. 실시간 SSE 스트리밍으로 도구 호출 과정 및 응답 확인
 
 ## Demo Scenarios
 
