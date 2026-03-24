@@ -9,6 +9,7 @@ from tools.financial import get_claim_summary
 from tools.analytics import detect_care_gaps, get_population_health_metrics
 from tools.schema_discovery import list_tables, get_table_schema, get_table_relationships
 from tools.query import run_custom_query
+from tools.pubmed import search_pubmed, get_pubmed_article
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -27,6 +28,8 @@ TOOL_REGISTRY = {
     "get_table_schema": get_table_schema,
     "get_table_relationships": get_table_relationships,
     "run_custom_query": run_custom_query,
+    "search_pubmed": search_pubmed,
+    "get_pubmed_article": get_pubmed_article,
 }
 
 

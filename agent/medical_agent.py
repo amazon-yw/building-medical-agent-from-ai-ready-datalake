@@ -121,6 +121,12 @@ TOOL_DEFS = [
     {"name": "run_custom_query",
      "doc": "Execute a read-only Spark SQL query. Only SELECT allowed. Use list_tables and get_table_schema first.",
      "params": {"query": None}},
+    {"name": "search_pubmed",
+     "doc": "Search PubMed for research articles. Returns title, abstract, journal, authors, and URL.",
+     "params": {"query": None, "max_results": 5}},
+    {"name": "get_pubmed_article",
+     "doc": "Fetch a specific PubMed article by PMID with full abstract.",
+     "params": {"pmid": None}},
 ]
 
 _tools = None

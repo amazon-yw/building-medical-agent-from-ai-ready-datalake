@@ -159,6 +159,16 @@ VS Code에서 노트북을 실행하여 MCP 서버와 관련 리소스를 직접
 2. Cognito User Pool + OAuth 클라이언트 설정
 3. AgentCore Gateway + MCP Target 생성 (`notebooks/02_setup_agentcore_gateway.ipynb`)
 4. MCP 서버 연동 테스트 (`notebooks/03_test_mcp_server.ipynb`)
+5. Amazon Q Business 연동 — Integrations → MCP server 추가
+
+| 필드 | 값 |
+|------|-----|
+| MCP Endpoint URL | `https://<gateway-id>.gateway.bedrock-agentcore.<region>.amazonaws.com/mcp` |
+| Authentication | OAuth 2.0 (Client Credentials) |
+| Token URL | Cognito OAuth Token URL (`/oauth2/token`) |
+| Client ID | Cognito App Client ID |
+| Client Secret | Cognito App Client Secret |
+| Scope | `fhir-mcp/tools` |
 
 ### Lab 4 — Medical AI Agent 배포 (VS Code)
 VS Code에서 노트북을 실행하여 Agent와 관련 리소스를 직접 배포합니다.

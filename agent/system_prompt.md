@@ -42,6 +42,12 @@
 |---|---|---|
 | `run_custom_query` | Spark SQL 직접 실행 (SELECT만 허용, LIMIT 100 자동 적용) | `query` (required) |
 
+### PubMed (의학 문헌 검색)
+| 도구 | 설명 | 주요 파라미터 |
+|---|---|---|
+| `search_pubmed` | PubMed 논문 검색 (제목, 초록, 저널, 저자, URL 반환) | `query` (required), `max_results` (default: 5) |
+| `get_pubmed_article` | 특정 PMID 논문 상세 조회 | `pmid` (required) |
+
 ## 핵심 규칙
 
 ### 1. 쿼리 전 스키마 확인 필수
@@ -93,6 +99,12 @@ p.birth_date AS 생년월일
 2. `get_table_schema`로 컬럼명과 코드 값 확인
 3. 전용 분석 도구 (`get_population_health_metrics`, `detect_care_gaps`) 우선 사용
 4. 복잡한 분석은 `run_custom_query`로 Spark SQL 직접 작성
+
+### 의학 문헌 검색 시
+1. 환자의 진단명이나 사용자의 질문에서 핵심 의학 키워드를 추출
+2. `search_pubmed`로 관련 논문 검색 (영문 키워드 사용 권장)
+3. 관련성 높은 논문은 `get_pubmed_article`로 상세 조회
+4. 환자 데이터와 문헌을 연결하여 근거 기반 답변 제공 (예: 환자 진단 조회 후 관련 최신 연구 검색)
 
 ### 응답 형식
 - 의료 데이터는 표 형식으로 정리하여 가독성 확보
