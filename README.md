@@ -8,22 +8,22 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 ┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────────┐
 │  Streamlit UI   │────▶│  AgentCore Runtime   │────▶│  Strands Agent      │
 │  (EC2:8501)     │ SSE │  (Container/ARM64)   │     │  (Claude Sonnet 4)  │
-└─────────────────┘     └──────────────────────┘     └────────┬────────────┘
-                                                              │ MCP Protocol
+└─────────────────┘     └──────────────────────┘     └───────┬─────────────┘
+                                                             │ MCP Protocol
                                                     ┌────────▼────────────┐
                                                     │  AgentCore Gateway  │
                                                     │  (Cognito OAuth)    │
                                                     └────────┬────────────┘
-                                                              │
+                                                             │
                                                     ┌────────▼────────────┐
                                                     │  Lambda MCP Server  │
                                                     │  (13 Tools)         │
                                                     └────────┬────────────┘
-                                                              │ Livy / Spark SQL
+                                                             │ Livy / Spark SQL
                                                     ┌────────▼────────────┐
                                                     │  EMR Serverless     │
                                                     └────────┬────────────┘
-                                                              │ Iceberg REST Catalog
+                                                             │ Iceberg REST Catalog
                                                     ┌────────▼────────────┐
                                                     │  S3 Tables          │
                                                     │  (24 FHIR Tables)   │
@@ -95,12 +95,14 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 | Analytics | `detect_care_gaps` | 케어 갭 분석 (누락 예방접종, 미수행 검진) |
 | Analytics | `get_population_health_metrics` | 인구 건강 지표 집계 |
 | Query | `run_custom_query` | Spark SQL 직접 실행 (SELECT only, LIMIT 100) |
+| PubMed | `search_pubmed` | Pubmed 검색 |
+| PubMed | `get_pubmed_article` | Pubmed Article 조회 |
 
 ## Workshop Labs
 
 ### Motivation: AI-Assisted Schema Mapping
 
-이 워크샵의 Lab 2는 [Automate schema mappings with LLMs](https://medium.com/road-to-full-stack-data-science/automate-schema-mappings-with-llms-637e55988524) (Tasos Pardalis, 2025)에서 제시한 아이디어에서 영감을 받았습니다. 레거시 데이터베이스에서 클라우드 데이터 레이크로 마이그레이션할 때, LLM을 활용하여 스키마 매핑과 메타데이터 생성을 자동화할 수 있습니다.
+이 워크샵의 Lab-1은 [Automate schema mappings with LLMs](https://medium.com/road-to-full-stack-data-science/automate-schema-mappings-with-llms-637e55988524) (Tasos Pardalis, 2025)에서 제시한 아이디어에서 영감을 받았습니다. 레거시 데이터베이스에서 클라우드 데이터 레이크로 마이그레이션할 때, LLM을 활용하여 스키마 매핑과 메타데이터 생성을 자동화할 수 있습니다.
 
 이 워크샵에서는 이 컨셉을 실제로 구현합니다:
 - Aurora PostgreSQL의 축약된 컬럼명(예: `sbj_ref`, `eff_dts`)을 LLM이 분석하여 의미 있는 이름(예: `subject_reference`, `effective_datetime`)으로 확장
@@ -108,8 +110,11 @@ FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵
 - 생성된 메타데이터를 S3 Tables의 Iceberg 테이블 DDL에 반영하여 AI-Ready Data Lake 구축
 - 이 메타데이터가 이후 MCP 서버의 Schema Discovery 도구와 Agent의 Text-to-SQL에 직접 활용
 
-### Lab 0 — 인프라 배포 (CDK)
-CDK로 워크샵에 필요한 전체 인프라를 배포합니다.
+### Lab 0 — 인프라 배포 및 개발환경 설정 (Optional)
+
+#### 인프라 배포 (CDK)
+> CDK로 워크샵에 필요한 전체 인프라를 배포합니다.
+
 1. VPC, Subnets, Security Groups
 2. Aurora PostgreSQL 클러스터 + Synthea FHIR 데이터 로딩
 3. S3 버킷 (데이터, DDL 스크립트, 메타데이터)
@@ -124,42 +129,113 @@ pip install -r requirements.txt
 cdk deploy
 ```
 
-### Lab 1 — 개발 환경 설정 (VS Code Server + Kiro CLI)
-EC2에 프로비저닝된 VS Code Server에 접속하여 개발 환경을 구성합니다.
-1. Cloud Formation의 fhir-data-stack의 output 중 VS Code Server URL 확보
+#### 개발환경 설정 > PostgreSQL 테이블 스키마 Crawling
+1. Glue 콘솔 페이지로 이동
+2. 좌측 메뉴에서 Data Catalog > Crawlers 선택
+3. `fhir-aurora-crawler`라는 이름의 Glue Crawler 선택
+4. `Run Crawler` 버튼 클릭하여 PostgreSQL 데이터베이스 내 테이블 스키마 크롤링
+
+#### 개발환경 설정 > SageMaker Unified Studio 생성
+1. SageMaker Unified Studio - IAM-based domain 생성
+    - Project data and administrative control 섹션 밑 Execution IAM role 설정을 `Auto-create a new role with admin permissions`로 셋팅
+2. 생성 후 프로젝트 VPC 설정 변경 -> `FhirDataStack/FhirVpc`로 설정
+3. 이후 아래 스크립트 수행
+    - Lake Formation으로 생성된 `AmazonSageMakerAdminIAMExecutionRole` 역할에 대해 S3 Tables 권한 부여
+
+    ```bash
+    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    REGION=$(aws configure get region)
+
+    aws lakeformation grant-permissions \
+    --region $REGION \
+    --principal "{\"DataLakePrincipalIdentifier\":\"arn:aws:iam::${ACCOUNT_ID}:role/service-role/AmazonSageMakerAdminIAMExecutionRole\"}" \
+    --resource "{\"Database\":{\"CatalogId\":\"${ACCOUNT_ID}:s3tablescatalog/fhir-bucket\",\"Name\":\"data\"}}" \
+    --permissions '["ALL"]' \
+    --permissions-with-grant-option '["ALL"]'
+
+    aws iam put-role-policy \
+    --role-name AmazonSageMakerAdminIAMExecutionRole \
+    --policy-name SecretsManagerReadAccess \
+    --policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret",
+            "secretsmanager:ListSecrets"
+            ],
+            "Resource": "*"
+        }
+        ]
+    }'
+    ```
+
+#### 개발환경 설정 > VS Code Server + Kiro CLI 셋업
+> EC2에 프로비저닝된 VS Code Server에 접속하여 개발 환경을 구성합니다.
+
+1. Cloud Formation의 `FhirDataStack`의 Outputs 탭에서 `CodeEditorURL` 확보
 2. VS Code Server 접속 (`http://<EC2-IP>:8080`)
 3. 워크샵 리포지토리 클론
 4. Kiro CLI 설치 및 인증
-```bash
-curl -fsSL https://cli.kiro.dev/install | bash
-kiro-cli
+```shell
+[participant@CodeEditor workshop]$ curl -fsSL https://cli.kiro.dev/install | bash
+
+Kiro CLI installer:
+
+Downloading package...
+✓ Downloaded and extracted
+✓ Package installed successfully
+
+🎉 Installation complete! Happy coding!
+
+Next steps:
+Use the command "kiro-cli" to get started!
+
+[participant@CodeEditor workshop]$ kiro-cli
+
+Welcome to Kiro CLI, let's get you signed in!
+
+Press enter to continue to the browser or esc to cancel
 ```
 
-### Lab 2 — AI-Ready Data Lake 구축 (Kiro CLI + SageMaker Unified Studio)
-Kiro CLI를 활용하여 레거시 DB의 메타데이터를 LLM으로 추출하고, SageMaker Unified Studio에서 데이터를 마이그레이션합니다.
+### Lab 1 — AI-Ready Data Lake 구축을 위한 개발 (Kiro CLI)
+> Kiro CLI를 활용하여 레거시 DB의 메타데이터를 LLM으로 추출하고, SageMaker Unified Studio에서 데이터를 마이그레이션합니다.
 
-**Step 1: LLM 기반 메타데이터 생성 (Kiro CLI, VS Code)**
-1. Glue Crawler 실행 → Aurora PostgreSQL 데이터 카탈로그 생성
-2. Kiro CLI에서 LLM을 활용하여 24개 테이블의 메타데이터 자동 생성 
-3. 생성된 메타데이터와 DDL을 S3에 업로드
-> 2, 3번 단계는 prompt.md 파일의 `[STEP-1] 원본 테이블의 메타데이터 추론` 섹션 내 프롬프트를 사용하여 생성합니다.
+**Step-1: LLM 기반 메타데이터 생성 (Kiro CLI, VS Code)**
+1. `prompt.md` 파일의 `[STEP-1] 원본 테이블의 메타데이터 추론` 섹션의 프롬프트를 사용하여 생성
+2. Kiro CLI에서 해당 프롬프트를 활용하여 24개 테이블의 메타데이터 자동 생성
+3. 메타데이터 기준으로 DDL 스크립트 생성
+    - DDL에는 생성한 메타데이터가 COMMENT나 DESCRIPTION 구문에 담겨져 생성
+4. 생성한 메타데이터와 DDL 스크립트를 S3에 업로드
 
-**Step 2: 데이터 마이그레이션 (SageMaker Unified Studio)**
-1. prompt.md 파일의 `[STEP-2] 생성된 메타데이터로 테이블 생성 노트북 작성` 섹션 내 프롬프트를 사용하여 테이블 생성 노트북 생성.
-2. SageMaker Unified Studio JupyterLab 접속
-3. 1에서 생성된 노트북을 열어 S3 Tables에 Iceberg 테이블 생성
-4. prompt.md 파일의 `[STEP-3] 데이터 마이그레이션 노트북 생성` 섹션 내 프롬프트를 사용하여 데이터 마이그레이션 노트북 생성.
-5. 4에서 생성된 노트북을 열어 Aurora PostgreSQL → S3 Tables 데이터 마이그레이션 (Spark SQL) 
-6. 마이그레이션 데이터 검증
+**Step-2: S3 Tables 내 테이블을 생성하는 노트북 생성**
+1. `prompt.md` 파일의 `[STEP-2] 생성된 메타데이터로 테이블 생성 노트북 작성` 섹션 내 프롬프트를 사용하여 테이블 생성 노트북 생성
+2. Kiro CLI에서 해당 프롬프트를 활용하여 S3 Tables에 24개 테이블을 생성하는 Jupyterlab 노트북 파일 생성
+3. 생성한 노트북 파일을 SageMaker Unified Studio가 참조하는 S3 경로에 업로드
 
+**Step-3: PostgreSQL -> S3 Tables 데이터 마이그레이션 노트북 생성**
+1. prompt.md 파일의 `[STEP-3] 데이터 마이그레이션 노트북 생성` 섹션 내 프롬프트를 사용하여 데이터 마이그레이션 노트북 생성
+2. Kiro CLI에서 해당 프롬프트를 활용하여 PostgreSQL에 있는 Legecy DB의 데이터를 S3 Tables로 마이그레이션 하는 Jupyterlab 노트북 파일 생성
+3. 생성한 노트북 파일을 SageMaker Unified Studio가 참조하는 S3 경로에 업로드
 
-### Lab 3 — MCP 서버 배포 (VS Code)
-VS Code에서 노트북을 실행하여 MCP 서버와 관련 리소스를 직접 배포합니다.
-1. Lambda MCP 서버 패키징 및 배포 — 13개 tool (`notebooks/01_deploy_mcp_lambda.ipynb`)
+### Lab 2 - AI-Ready Data Lake 구축 (SageMaker Unified Studio)
+> SageMaker Unified Studio 환경의 노트북에서 관련 작업을 진행합니다.
+
+1. SageMaker Unified Studio JupyterLab 접속
+2. `Step-2`에서 생성된 노트북을 열어 S3 Tables에 Iceberg 테이블 생성
+3. `Step-3`에서 생성된 노트북을 열어 Aurora PostgreSQL → S3 Tables 데이터 마이그레이션 (Spark SQL) 
+4. 마이그레이션 데이터 검증
+
+### Lab 3 — MCP 서버 구축 (VS Code)
+> VS Code에서 노트북을 실행하여 MCP 서버와 관련 리소스를 직접 배포합니다.
+
+1. Lambda MCP 서버 패키징 및 배포 — 15개 tool (`notebooks/01_deploy_mcp_lambda.ipynb`)
 2. Cognito User Pool + OAuth 클라이언트 설정
 3. AgentCore Gateway + MCP Target 생성 (`notebooks/02_setup_agentcore_gateway.ipynb`)
 4. MCP 서버 연동 테스트 (`notebooks/03_test_mcp_server.ipynb`)
-5. Amazon Q Business 연동 — Integrations → MCP server 추가
+5. Amazon Quick 연동 — Integrations → MCP server 추가
 
 | 필드 | 값 |
 |------|-----|
@@ -171,19 +247,19 @@ VS Code에서 노트북을 실행하여 MCP 서버와 관련 리소스를 직접
 | Scope | `fhir-mcp/tools` |
 
 ### Lab 4 — Medical AI Agent 배포 (VS Code)
-VS Code에서 노트북을 실행하여 Agent와 관련 리소스를 직접 배포합니다.
+> VS Code에서 노트북을 실행하여 Agent와 관련 리소스를 직접 배포합니다.
+
 1. ECR 리포지토리 생성
 2. CodeBuild 프로젝트 설정 (ARM64)
 3. Strands Agent 컨테이너 빌드 및 ECR 푸시
 4. AgentCore Runtime 생성 및 배포 (`notebooks/04_deploy_medical_agent.ipynb`)
 
-### Lab 5 — Streamlit UI 실행 및 데모
-Streamlit 채팅 UI를 실행하여 Medical AI Agent를 체험합니다.
+> Streamlit 채팅 UI를 실행하여 Medical AI Agent를 체험합니다.
 1. EC2에서 Streamlit 앱 실행
 ```bash
-AGENT_ARN="<agent-runtime-arn>" AWS_REGION="us-west-2" \
-python3.12 -m streamlit run agent/app.py --server.port 8501 --server.address 0.0.0.0
+./run_app.py
 ```
+
 2. 브라우저에서 `http://<EC2-IP>:8501` 접속
 3. 사이드바 시나리오 버튼으로 데모 질의 실행
 4. 실시간 SSE 스트리밍으로 도구 호출 과정 및 응답 확인
@@ -210,6 +286,14 @@ python3.12 -m streamlit run agent/app.py --server.port 8501 --server.address 0.0
 "우리 병원에서 가장 많이 처방되는 약물 top 10이 뭐야?"
 ```
 → Agent가 `list_tables` → `get_table_schema` → `run_custom_query` 순서로 호출하여 SQL 생성 및 실행
+
+### 시나리오 4: Pubmed 관련 질의
+```
+"제2형 당뇨병 최신 치료 가이드라인 관련 논문 찾아줘"
+"이 환자의 진단명과 관련된 최신 연구 논문이 있을까?"
+"메트포르민과 SGLT2 억제제 병용 요법에 대한 연구 결과 알려줘"
+"이 중에서 가장 관련 있는 논문 상세 내용 보여줘"
+```
 
 ## Tech Stack
 
