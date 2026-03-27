@@ -2,13 +2,13 @@
 
 ---
 
-## [STEP-1] 원본 테이블의 메타데이터 추론
+## [STEP-1] Infer Metadata from Source Tables
 
 Tables in "AwsDataCatalog.fhir_db" are related with patient data.
 Please create metadata for the tables in "AwsDataCatalog.fhir_db". The reason I'm asking for metadata creation first is that I want to build tables that AI can understand effectively. For AI to work well with the data, comprehensive metadata for each table and column is essential. I'll use this metadata later when creating tables in S3 Tables to build the data lake. Since there are 24 tables in "AwsDataCatalog.fhir_db", the response might be quite huge, so please create the actual Python code to generate the comprehensive metadata for making it concise and efficient to avoid any issues. Python code should use "boto3.client('glue')" not pyspark.
 
 ### Environment Info
-- Region: us-west-2
+- Region: us-east-1
 - S3 Bucket: Use the S3 bucket that contains "fhir-data" in its name
 - S3 Prefix: metadata/
 - Glue Database: fhir_db
@@ -63,7 +63,7 @@ The JSON structure MUST conform to the following schema exactly. Any deviation w
   "generated_at": "ISO-8601 timestamp string",
   "source_database": "fhir_db",
   "source_catalog": "AwsDataCatalog",
-  "region": "us-west-2",
+  "region": "us-east-1",
   "total_tables": 24,
   "total_columns": 498,
   "domains": { ... },
@@ -190,12 +190,12 @@ Instead of printing huge amounts of text (which would be overwhelming), the code
 
 ---
 
-## [STEP-2] 생성된 메타데이터로 테이블 생성 노트북 작성
+## [STEP-2] Create Table Creation Notebook from Generated Metadata
 
 I want to create tables in S3 Tables based on the generated metadata. For the tables created in S3 Tables, use full, descriptive names for all tables and columns instead of abbreviations like in the source tables to improve readability. I'd like to follow along with the table creation process in a SageMaker Unified Studio JupyterLab notebook environment. So please create/save it as a notebook file on Shared S3 so that it can be opened and used directly in JupyterLab.
 
 ### Environment Info
-- Region: us-west-2
+- Region: us-east-1
 - Metadata sources: s3://<fhir-data bucket>/metadata/
 - Notebook destination: s3://<amazon-sagemaker bucket>/shared/fhir_s3tables_creation.ipynb
 - S3 bucket discovery: Find buckets containing "fhir-data" and "amazon-sagemaker" in their names
@@ -275,12 +275,12 @@ spark.sql(<create statement>)
 
 ---
 
-## [STEP-3] 데이터 마이그레이션 노트북 생성
+## [STEP-3] Create Data Migration Notebook
 
 I want to generate code that reads data from Aurora PostgreSQL tables and INSERTs it into the corresponding mapped S3 Tables. This code will be executed in SageMaker Unified Studio's JupyterLab, so please create it as a notebook file on Shared S3 so that it can be used directly in JupyterLab.
 
 ### Environment Info
-- Region: us-west-2
+- Region: us-east-1
 - Metadata sources: s3://<fhir-data bucket>/metadata/
 - Notebook destination: s3://<amazon-sagemaker bucket>/shared/fhir_data_loading.ipynb
 - S3 bucket discovery: Find buckets containing "fhir-data" and "amazon-sagemaker" in their names
@@ -310,7 +310,8 @@ session = boto3.session.Session()
 
 region = session.region_name
 account_id = session.client('sts').get_caller_identity()['Account']
-secret_id = session.client('secretsmanager').list_secrets()['SecretList'][0]['Name']
+secrets = session.client('secretsmanager').list_secrets()['SecretList']
+secret_id = next(s['Name'] for s in secrets if 'FhirDatabase' in s['Name'])
 secretsmanager = boto3.client('secretsmanager', region_name=region)
 secret = secretsmanager.get_secret_value(SecretId=secret_id)
 creds = json.loads(secret['SecretString'])

@@ -1,5 +1,5 @@
 """
-FHIR Medical AI Agent — Streamlit Chat UI (AgentCore Runtime SSE Streaming)
+Medical AI Agent — Streamlit Chat UI (AgentCore Runtime SSE Streaming)
 Run: python3.12 -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 """
 
@@ -10,7 +10,7 @@ import streamlit as st
 import json, time, re, uuid, boto3
 from pathlib import Path
 
-st.set_page_config(page_title="FHIR Medical AI Agent", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Medical AI Agent", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
@@ -131,7 +131,7 @@ if "session_id" not in st.session_state:
 
 # ── Sidebar ──────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 🏥 FHIR Medical Agent")
+    st.markdown("### 🏥 Medical Agent")
     if AGENT_ARN:
         st.success("● Runtime 연결됨", icon="✅")
         with st.expander("Agent ARN"):
@@ -167,8 +167,8 @@ with st.sidebar:
 # ── Main ─────────────────────────────────────────────────────
 st.markdown("""
 <div class="main-header">
-    <h1>🏥 FHIR Medical AI Agent</h1>
-    <p>FHIR 데이터 레이크 기반 의료 AI 에이전트 — AgentCore Runtime + Gateway MCP + S3 Tables</p>
+    <h1>🏥 Medical AI Agent</h1>
+    <p>메디컬 데이터 레이크 기반 의료 AI 에이전트 — AgentCore Runtime + Gateway MCP + S3 Tables</p>
 </div>
 """, unsafe_allow_html=True)
 

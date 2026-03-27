@@ -1,6 +1,6 @@
 # Building Medical AI Agent from AI-Ready Data Lake
 
-FHIR 의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵입니다. Synthea 합성 데이터를 Aurora PostgreSQL에서 S3 Tables(Iceberg)로 마이그레이션하고, MCP 서버를 통해 AI 에이전트가 자연어로 의료 데이터를 조회·분석할 수 있는 엔드투엔드 파이프라인을 구축합니다.
+의료 데이터 레이크 기반 AI 에이전트를 구축하는 워크샵입니다. Synthea 합성 데이터를 Aurora PostgreSQL에서 S3 Tables(Iceberg)로 마이그레이션하고, MCP 서버를 통해 AI 에이전트가 자연어로 의료 데이터를 조회·분석할 수 있는 엔드투엔드 파이프라인을 구축합니다.
 
 ## Architecture
 
@@ -144,7 +144,7 @@ cdk deploy
 
     ```bash
     ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    REGION=$(aws configure get region)
+    REGION="${AWS_REGION:-us-east-1}"
 
     aws lakeformation grant-permissions \
     --region $REGION \

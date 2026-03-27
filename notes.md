@@ -366,7 +366,7 @@ aws lakeformation grant-permissions \
 - 아래 스크립트 수행
 ```bash
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+REGION="${AWS_REGION:-us-east-1}"
 
 aws lakeformation grant-permissions \
   --region $REGION \

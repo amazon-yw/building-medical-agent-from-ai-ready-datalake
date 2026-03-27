@@ -16,6 +16,7 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_secretsmanager as secretsmanager,
     aws_ssm as ssm,
+    aws_sso as sso,
     custom_resources as cr,
     Duration,
     RemovalPolicy,
@@ -1226,6 +1227,15 @@ def handler(event, context):
             actions=["iam:*"],
             resources=["*"]
         ))
+        # AWS Marketplace permissions for Bedrock model access
+        code_editor_role.add_to_policy(iam.PolicyStatement(
+            actions=[
+                "aws-marketplace:ViewSubscriptions",
+                "aws-marketplace:Subscribe",
+                "aws-marketplace:Unsubscribe",
+            ],
+            resources=["*"]
+        ))
         # Secrets Manager read for DB credentials
         db_cluster.secret.grant_read(code_editor_role)
 
@@ -1236,7 +1246,7 @@ def handler(event, context):
             allow_all_outbound=True
         )
         code_editor_sg.add_ingress_rule(
-            ec2.Peer.prefix_list("pl-82a045eb"),  # us-west-2 CloudFront prefix list
+            ec2.Peer.any_ipv4(),
             ec2.Port.tcp(80),
             "CloudFront origin-facing"
         )
@@ -1470,3 +1480,110 @@ def handler(event, context):
             ],
             resources=[f"arn:aws:emr-serverless:{self.region}:{self.account}:/applications/*"]
         ))
+
+        # ============================================================
+        # IAM Identity Center (SSO) + Q Developer Pro
+        # ============================================================
+
+        # SSO Instance
+        sso_instance = sso.CfnInstance(self, "SSOInstance")
+
+        # Lambda role for IDC setup
+        idc_lambda_role = iam.Role(self, "IDCLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
+                iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
+            ],
+        )
+        idc_lambda_role.add_to_policy(iam.PolicyStatement(
+            actions=[
+                "sso:DescribeInstance", "sso:ListInstances",
+                "identitystore:CreateGroup", "identitystore:CreateGroupMembership",
+                "identitystore:CreateUser", "identitystore:ListUsers", "identitystore:ListGroups",
+            ],
+            resources=[
+                sso_instance.attr_instance_arn,
+                f"arn:aws:identitystore::{self.account}:identitystore/*",
+                "arn:aws:identitystore:::*",
+            ],
+        ))
+
+        # Lambda to create IDC user, group, Q Developer Pro profile
+        idc_lambda = lambda_.Function(self, "IDCSetupLambda",
+            runtime=lambda_.Runtime.PYTHON_3_10,
+            handler="index.handler",
+            timeout=Duration.minutes(5),
+            role=idc_lambda_role,
+            code=lambda_.Code.from_inline(open(
+                os.path.join(os.path.dirname(__file__), "idc_setup_handler.py")
+            ).read()),
+        )
+
+        # Custom resource to trigger IDC setup
+        idc_setup = CustomResource(self, "IDCSetup",
+            service_token=idc_lambda.function_arn,
+            properties={
+                "InstanceArn": sso_instance.attr_instance_arn,
+                "IdentityStoreId": sso_instance.attr_identity_store_id,
+            },
+        )
+        idc_setup.node.add_dependency(sso_instance)
+
+        # Outputs
+        CfnOutput(self, "IDCUsername", value="qdev")
+        CfnOutput(self, "IDCUserEmail", value="qdev@example.com")
+        CfnOutput(self, "IDCStartURL",
+            value=idc_setup.get_att_string("StartURL"))
+        CfnOutput(self, "IDCPassword",
+            value=idc_setup.get_att_string("PasswordOTP"))
+        CfnOutput(self, "IDCRegion", value="us-east-1")
+
+        # ============================================================
+        # Bedrock Model Access Activation
+        # ============================================================
+
+        bedrock_access_fn = lambda_.Function(self, "BedrockModelAccessFn",
+            runtime=lambda_.Runtime.PYTHON_3_13,
+            handler="index.handler",
+            timeout=Duration.seconds(120),
+            code=lambda_.Code.from_inline("""
+import boto3, json, urllib.request, time
+def send(event, ctx, status, data={}):
+    body = json.dumps({"Status": status, "Reason": str(data), "PhysicalResourceId": ctx.log_stream_name,
+        "StackId": event["StackId"], "RequestId": event["RequestId"],
+        "LogicalResourceId": event["LogicalResourceId"], "Data": data}).encode()
+    urllib.request.urlopen(urllib.request.Request(event["ResponseURL"], data=body, method="PUT", headers={"Content-Type": ""}))
+def handler(event, ctx):
+    if event["RequestType"] == "Delete": return send(event, ctx, "SUCCESS")
+    try:
+        client = boto3.client("bedrock", region_name=event["ResourceProperties"]["Region"])
+        for m in event["ResourceProperties"]["ModelIds"]:
+            try:
+                client.put_foundation_model_entitlement(modelId=m)
+                print(f"Enabled: {m}")
+            except Exception as e: print(f"{m}: {e}")
+        time.sleep(5)
+        send(event, ctx, "SUCCESS")
+    except Exception as e:
+        print(e)
+        send(event, ctx, "FAILED", {"Error": str(e)})
+"""),
+        )
+        bedrock_access_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["bedrock:PutFoundationModelEntitlement", "bedrock:GetFoundationModelAvailability"],
+            resources=["*"],
+        ))
+        bedrock_access_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["aws-marketplace:ViewSubscriptions", "aws-marketplace:Subscribe"],
+            resources=["*"],
+        ))
+
+        CustomResource(self, "BedrockModelAccess",
+            service_token=bedrock_access_fn.function_arn,
+            properties={
+                "Region": self.region,
+                "ModelIds": ["anthropic.claude-sonnet-4-20250514"],
+            },
+        )
+

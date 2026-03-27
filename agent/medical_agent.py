@@ -1,5 +1,5 @@
 """
-FHIR Medical Data Agent — AgentCore Runtime + Gateway MCP
+Medical Data Agent — AgentCore Runtime + Gateway MCP
 """
 
 import os, json, logging, time

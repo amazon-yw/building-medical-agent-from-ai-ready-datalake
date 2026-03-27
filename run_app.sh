@@ -1,5 +1,5 @@
 #!/bin/bash
-export AWS_REGION="${AWS_REGION:-us-west-2}"
+export AWS_REGION="${AWS_REGION:-us-east-1}"
 export AGENT_ARN=$(aws bedrock-agentcore-control list-agent-runtimes --region "$AWS_REGION" \
   --query 'agentRuntimes[?status==`READY`].agentRuntimeArn | [0]' --output text)
 
@@ -9,4 +9,6 @@ if [ "$AGENT_ARN" = "None" ] || [ -z "$AGENT_ARN" ]; then
 fi
 echo "AGENT_ARN: $AGENT_ARN"
 
-python3.12 -m streamlit run agent/app.py --server.port 8501 --server.address 0.0.0.0
+pip install -q streamlit boto3 2>/dev/null
+
+python3 -m streamlit run agent/app.py --server.port 8501 --server.address 0.0.0.0

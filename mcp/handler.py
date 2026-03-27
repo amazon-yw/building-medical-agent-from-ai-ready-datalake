@@ -49,10 +49,14 @@ def handler(event, context):
     if not tool_name:
         tool_name = event.get("toolName") or event.get("tool_name") or event.get("name")
 
-    arguments = event  # Gateway sends arguments as the event itself
+    arguments = event.get("arguments", event)  # Direct invoke sends {toolName, arguments}, Gateway sends args as event
 
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
+
+    # Remove meta keys that are not tool arguments
+    for key in ("toolName", "tool_name", "name"):
+        arguments.pop(key, None)
 
     if tool_name not in TOOL_REGISTRY:
         return {"status": "error", "message": f"Unknown tool: {tool_name}"}
