@@ -234,7 +234,7 @@ async def invoke(payload, context):
                         if tid not in emitted_tool_ids:
                             emitted_tool_ids.add(tid)
                             name = tu.get("name", "unknown")
-                            inp_str = json.dumps(tu.get("input", {}), ensure_ascii=False)[:300]
+                            inp_str = json.dumps(tu.get("input", {}), ensure_ascii=False)
                             yield f"\n\n🔧 **{name}**\n📥 Input: `{inp_str}`\n"
                     if "toolResult" in obj:
                         tr = obj["toolResult"]
