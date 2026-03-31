@@ -9,7 +9,7 @@ import streamlit as st
 import json, time, re, uuid, boto3
 from pathlib import Path
 
-st.set_page_config(page_title="Medical AI Agent", page_icon="⚕️", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Medical AI Agent", page_icon="⚕️", layout="centered", initial_sidebar_state="expanded")
 
 REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 AGENT_ARN = os.getenv("AGENT_ARN", "")
