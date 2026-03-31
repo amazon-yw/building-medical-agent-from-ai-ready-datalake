@@ -1,0 +1,5 @@
+{
+  "name": "MediAgent AI",
+  "description": "전문적인 의료 상담 및 정보 검색을 제공하는 AI 메디컬 에이전트",
+  "requestFramePermissions": []
+}

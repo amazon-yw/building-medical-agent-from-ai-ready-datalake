@@ -12,10 +12,9 @@ SG_ID=$(aws ec2 describe-instances \
   --query "Reservations[0].Instances[0].SecurityGroups[0].GroupId" --output text)
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 
-aws ec2 authorize-security-group-ingress --region "$REGION" \
-  --group-id "$SG_ID" \
-  --protocol tcp --port 8501 \
-  --cidr "$1/32" \
-  --tag-specifications 'ResourceType=security-group-rule,Tags=[{Key=Description,Value=Streamlit UI}]'
-
-echo "Allowed $1 on port 8501"
+for PORT in 8501 3000; do
+  aws ec2 authorize-security-group-ingress --region "$REGION" \
+    --group-id "$SG_ID" \
+    --protocol tcp --port "$PORT" \
+    --cidr "$1/32" 2>/dev/null && echo "Allowed $1 on port $PORT" || echo "Port $PORT already open for $1"
+done
