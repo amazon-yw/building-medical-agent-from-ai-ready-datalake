@@ -797,7 +797,7 @@ def handler(event, context):
             runtime=lambda_.Runtime.PYTHON_3_13,
             handler="index.handler",
             code=lambda_.Code.from_inline("""
-import boto3, json, urllib.request
+import boto3, json, urllib.request, time
 def send_response(event, context, status, data={}):
     body = json.dumps({'Status': status, 'Reason': str(data), 'PhysicalResourceId': context.log_stream_name, 'StackId': event['StackId'], 'RequestId': event['RequestId'], 'LogicalResourceId': event['LogicalResourceId'], 'Data': data}).encode()
     urllib.request.urlopen(urllib.request.Request(event['ResponseURL'], data=body, headers={'Content-Type':'','Content-Length':str(len(body))}, method='PUT'))
@@ -819,16 +819,25 @@ def handler(event, context):
                 settings['DataLakeAdmins'] = admins
                 lf.put_data_lake_settings(DataLakeSettings=settings)
 
-            lf.grant_permissions(
-                Principal={'DataLakePrincipalIdentifier': principal_arn},
-                Resource={'Database': {'CatalogId': catalog_id, 'Name': db_name}},
-                Permissions=['ALL'], PermissionsWithGrantOption=['ALL']
-            )
-            lf.grant_permissions(
-                Principal={'DataLakePrincipalIdentifier': principal_arn},
-                Resource={'Table': {'CatalogId': catalog_id, 'DatabaseName': db_name, 'TableWildcard': {}}},
-                Permissions=['ALL'], PermissionsWithGrantOption=['ALL']
-            )
+            for attempt in range(6):
+                try:
+                    lf.grant_permissions(
+                        Principal={'DataLakePrincipalIdentifier': principal_arn},
+                        Resource={'Database': {'CatalogId': catalog_id, 'Name': db_name}},
+                        Permissions=['ALL'], PermissionsWithGrantOption=['ALL']
+                    )
+                    lf.grant_permissions(
+                        Principal={'DataLakePrincipalIdentifier': principal_arn},
+                        Resource={'Table': {'CatalogId': catalog_id, 'DatabaseName': db_name, 'TableWildcard': {}}},
+                        Permissions=['ALL'], PermissionsWithGrantOption=['ALL']
+                    )
+                    break
+                except Exception as e:
+                    if 'not found' in str(e).lower() and attempt < 5:
+                        print(f'Retry {attempt+1}/5: {e}')
+                        time.sleep(10)
+                    else:
+                        raise
 
         elif event['RequestType'] == 'Delete':
             try:
@@ -857,7 +866,7 @@ def handler(event, context):
         send_response(event, context, 'FAILED', {'Error': str(e)})
 """),
             role=lf_grant_role,
-            timeout=Duration.seconds(60)
+            timeout=Duration.seconds(120)
         )
 
         lf_provider = cr.Provider(self, "LFGrantProvider",

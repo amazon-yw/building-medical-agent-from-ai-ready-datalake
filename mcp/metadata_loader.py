@@ -60,20 +60,35 @@ def _all_expanded_names(table_name: str) -> dict[str, str]:
 
 def find_column(table_name: str, *keywords: str) -> str:
     """Find column by matching keywords against expanded_name.
-    Tries exact match first, then substring match, across all provided keywords in priority order.
+    Tries exact match, then substring match, then token-based fuzzy match.
     Returns the expanded_name (which is the actual S3 Tables column name)."""
     cols = get_column_map(table_name)
     expanded_names = [info.get("expanded_name", "") for info in cols.values()]
 
     for kw in keywords:
+        kw_lower = kw.lower()
         # Exact match
         for en in expanded_names:
             if en == kw:
                 return en
-        # Substring match
+        # Substring match (keyword in column name or column name in keyword)
         for en in expanded_names:
-            if kw.lower() in en.lower():
+            en_lower = en.lower()
+            if kw_lower in en_lower or en_lower in kw_lower:
                 return en
+        # Token-based fuzzy match: split by _ and check if key tokens overlap
+        kw_tokens = set(kw_lower.replace("datetime", "").replace("date", "").split("_"))
+        kw_tokens.discard("")
+        if kw_tokens:
+            best, best_score = None, 0
+            for en in expanded_names:
+                en_tokens = set(en.lower().replace("datetime", "").replace("date", "").split("_"))
+                en_tokens.discard("")
+                overlap = len(kw_tokens & en_tokens)
+                if overlap > best_score:
+                    best, best_score = en, overlap
+            if best and best_score >= max(1, len(kw_tokens) - 1):
+                return best
     # Return first keyword as fallback
     return keywords[0] if keywords else ""
 

@@ -171,9 +171,7 @@ The MCP server's find_column() function looks up columns by expanded_name. The f
 | Clinical status | clinical_status or clinical_status_code | cln_sts_cd |
 | Billable period start | billable_period_start | blb_prd_st |
 
-│ **Note**: The abbreviated column names above are examples. The actual abbreviated names vary per workshop participant since they are 
-inferred by AI. What matters is that expanded_name follows the conventions above so the MCP server's find_column() can resolve them 
-correctly.
+│ **Note**: The abbreviated column names above are examples. The actual abbreviated names vary per workshop participant since they are inferred by AI. What matters is that expanded_name follows the conventions above so the MCP server's find_column() can resolve them correctly.
 
 ### Why This Approach?
 Instead of printing huge amounts of text (which would be overwhelming), the code:
@@ -181,6 +179,40 @@ Instead of printing huge amounts of text (which would be overwhelming), the code
 - Stores persistently: Saves to S3 for reuse across sessions
 - Stays accessible: Keeps metadata in the fhir_metadata variable for immediate use
 - Provides summaries: Shows progress per table with column count and unknown column status during execution
+
+### [HINT] Required Table and Column Names for MCP Server Compatibility
+
+The MCP server tools use `find_column()` to look up columns by `expanded_name`. To ensure compatibility, the metadata MUST use the following table keys and column `expanded_name` values. These are **mandatory** — the MCP server will fail if these names are not present.
+
+#### Required Table Keys (in `tables` object)
+```
+patient, encounter, condition, observation, medication_request,
+allergy_intolerance, immunization, care_plan, claim
+```
+
+#### Required Column expanded_name Values per Table
+
+| Table | Required expanded_name | Semantic Purpose |
+|-------|----------------------|------------------|
+| patient | `resource_id` | Primary key |
+| patient | `name_given` | First name |
+| patient | `name_family` | Last name |
+| patient | `gender` | Gender code |
+| patient | `birth_date` | Date of birth |
+| encounter | `period_start_datetime` | Encounter start time |
+| encounter | `class_code` | Encounter class (AMB/IMP/EMER) |
+| observation | `code_display` | Observation type display text |
+| observation | `effective_datetime` | Observation timestamp |
+| medication_request | `status` | Prescription status |
+| medication_request | `authored_datetime` | Prescription date |
+| condition | `code_display` | Diagnosis display text |
+| condition | `onset_datetime` | Diagnosis onset |
+| condition | `category_display` | Condition category |
+| claim | `billable_period_start` | Billing period start |
+| claim | `status` | Claim status |
+| (all clinical tables) | `subject_reference` or `patient_reference` | FK to patient table |
+
+> **Important**: If the LLM infers a different name (e.g., `cd_display` instead of `code_display`), the MCP server's fuzzy matching will attempt to resolve it, but using the exact names above is strongly preferred.
 
 ### Next Steps for S3 Tables Creation
 - Load metadata: fhir_metadata['tables']['table_name']
