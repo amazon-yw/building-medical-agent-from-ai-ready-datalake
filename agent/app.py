@@ -56,20 +56,27 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .tool-step {
     display: flex; align-items: center; gap: 0.6rem;
     padding: 0.4rem 0.8rem; margin: 0.3rem 0;
-    background: #f7fafc; border-left: 3px solid #2980b9;
+    background: #edf2f7; border-left: 3px solid #2980b9;
     border-radius: 0 6px 6px 0; font-size: 0.8rem;
+    color: #2d3748;
 }
 .tool-step.done { border-left-color: #38a169; }
 .tool-step.error { border-left-color: #e53e3e; }
-.tool-step-name { font-weight: 600; color: #2d3748; }
-.tool-step-time { color: #a0aec0; font-size: 0.7rem; margin-left: auto; }
+.tool-step-name { font-weight: 600; color: #1a202c; }
+.tool-step-time { color: #718096; font-size: 0.7rem; margin-left: auto; }
 
 /* Chat */
 .stChatMessage { border-radius: 10px !important; }
 
 /* Sidebar */
-section[data-testid="stSidebar"] { background: #f8fafc; }
-section[data-testid="stSidebar"] .stMarkdown h3 { color: #1a5276; font-size: 0.95rem; }
+section[data-testid="stSidebar"] { background: #f0f4f8; }
+section[data-testid="stSidebar"] * { color: #1a202c !important; }
+section[data-testid="stSidebar"] .stMarkdown h3 { color: #1a5276 !important; font-size: 0.95rem; }
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown span,
+section[data-testid="stSidebar"] .stMarkdown label { color: #2d3748 !important; }
+section[data-testid="stSidebar"] button { color: #2d3748 !important; }
+section[data-testid="stSidebar"] .stExpander summary span { color: #1a202c !important; font-weight: 500; }
 </style>
 """, unsafe_allow_html=True)
 
