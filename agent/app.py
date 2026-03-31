@@ -145,7 +145,7 @@ with st.sidebar:
     show_tool_result = st.checkbox("📋 도구 응답 표시", value=True)
 
     st.divider()
-    st.markdown("### 💡 예시 질문")
+    st.markdown("### 💡 시나리오")
     for scenario in load_scenarios():
         with st.expander(scenario["label"]):
             for btn_label, q_text in scenario["questions"]:
