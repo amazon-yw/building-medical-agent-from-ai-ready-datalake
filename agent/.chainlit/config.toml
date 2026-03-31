@@ -1,0 +1,19 @@
+[project]
+name = "Medical AI Agent"
+enable_telemetry = false
+
+[features]
+prompt_playground = false
+multi_modal = false
+
+[UI]
+name = "Medical AI Agent"
+description = "FHIR Data Lake 기반 의료 AI 에이전트"
+default_theme = "light"
+hide_cot = false
+
+[UI.theme.light]
+background = "#ffffff"
+paper = "#f8f9fa"
+primary = "#1a5276"
+secondary = "#2980b9"
