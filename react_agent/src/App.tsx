@@ -189,62 +189,68 @@ export default function App() {
             <p className="text-[10px] md:text-xs text-slate-500 font-medium">AI-ready Data Lake · AgentCore · MCP Server</p>
           </div>
         </div>
-        <button
-          onClick={() => { setMessages([]); setCurrentTools([]); }}
-          className="text-slate-400 hover:text-sky-500 transition-colors p-2 hover:bg-sky-50 rounded-full"
-          title="대화 초기화"
-        >
-          <RefreshCw className="w-5 h-5" />
-        </button>
       </header>
 
-      {/* Chat Area */}
+      {/* Body: Sidebar + Chat */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar — Scenarios */}
+        <aside className="w-72 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto p-3 space-y-2">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">💡 데모 시나리오</h3>
+          {SCENARIOS.map((s, i) => (
+            <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpandedScenario(expandedScenario === i ? null : i)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-sky-50 transition-colors text-left"
+              >
+                <span className="text-base">{s.icon}</span>
+                <span className="font-semibold text-slate-700 text-xs flex-1">{s.label}</span>
+                {expandedScenario === i ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+              </button>
+              <AnimatePresence>
+                {expandedScenario === i && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3 pb-2.5 space-y-1 border-t border-slate-100 pt-1.5">
+                      {s.questions.map((q, qi) => (
+                        <button
+                          key={qi}
+                          onClick={() => handleSend(q)}
+                          className="w-full text-left px-2.5 py-1.5 bg-white hover:bg-sky-50 hover:border-sky-300 border border-slate-200 rounded-lg text-[11px] text-slate-600 transition-all leading-snug"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
+          <div className="pt-2">
+            <button
+              onClick={() => { setMessages([]); setCurrentTools([]); setExpandedScenario(null); }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 대화 초기화
+            </button>
+          </div>
+        </aside>
+
+        {/* Right: Chat Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
       <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 scroll-smooth">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-lg mx-auto">
+          <div className="h-full flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
             <div className="bg-sky-100 p-6 rounded-full">
               <Bot className="w-12 h-12 text-sky-600" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800">무엇을 도와드릴까요?</h2>
-              <p className="text-slate-500 text-sm">FHIR 데이터 레이크 기반 의료 AI 에이전트입니다.</p>
-            </div>
-            {/* Scenario cards with expandable questions */}
-            <div className="w-full space-y-2">
-              {SCENARIOS.map((s, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <button
-                    onClick={() => setExpandedScenario(expandedScenario === i ? null : i)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-sky-50 transition-colors text-left"
-                  >
-                    <span className="text-xl">{s.icon}</span>
-                    <span className="font-semibold text-slate-700 text-sm flex-1">{s.label}</span>
-                    {expandedScenario === i ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                  </button>
-                  <AnimatePresence>
-                    {expandedScenario === i && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 pb-3 space-y-1.5 border-t border-slate-100 pt-2">
-                          {s.questions.map((q, qi) => (
-                            <button
-                              key={qi}
-                              onClick={() => handleSend(q)}
-                              className="w-full text-left px-3 py-2 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 border border-slate-200 rounded-lg text-xs text-slate-600 transition-all"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
+              <h2 className="text-xl font-bold text-slate-800">무엇을 도와드릴까요?</h2>
+              <p className="text-slate-500 text-sm">좌측 시나리오를 선택하거나 직접 질문하세요.</p>
             </div>
           </div>
         )}
@@ -310,49 +316,6 @@ export default function App() {
 
       {/* Input */}
       <footer className="bg-white border-t border-slate-200 p-3 md:p-4">
-        {/* Scenario quick buttons - always visible */}
-        {messages.length > 0 && (
-          <div className="max-w-3xl mx-auto mb-2">
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              {SCENARIOS.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => setExpandedScenario(expandedScenario === i ? null : i)}
-                  className={cn(
-                    "flex-shrink-0 px-3 py-1.5 rounded-full text-xs border transition-colors",
-                    expandedScenario === i
-                      ? "bg-sky-100 border-sky-300 text-sky-700"
-                      : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-sky-50 hover:border-sky-200"
-                  )}
-                >
-                  {s.icon} {s.label}
-                </button>
-              ))}
-            </div>
-            <AnimatePresence>
-              {expandedScenario !== null && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-wrap gap-1.5 pt-2">
-                    {SCENARIOS[expandedScenario].questions.map((q, qi) => (
-                      <button
-                        key={qi}
-                        onClick={() => { handleSend(q); setExpandedScenario(null); }}
-                        className="text-left px-3 py-1.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg text-[11px] text-slate-600 transition-all"
-                      >
-                        {q.length > 40 ? q.substring(0, 40) + '...' : q}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="max-w-3xl mx-auto relative">
           <input
             type="text"
@@ -378,6 +341,8 @@ export default function App() {
           <span>MCP SERVER</span>
         </div>
       </footer>
+      </div>{/* end chat column */}
+      </div>{/* end body flex */}
     </div>
   );
 }
