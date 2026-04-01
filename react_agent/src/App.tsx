@@ -310,6 +310,49 @@ export default function App() {
 
       {/* Input */}
       <footer className="bg-white border-t border-slate-200 p-3 md:p-4">
+        {/* Scenario quick buttons - always visible */}
+        {messages.length > 0 && (
+          <div className="max-w-3xl mx-auto mb-2">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              {SCENARIOS.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => setExpandedScenario(expandedScenario === i ? null : i)}
+                  className={cn(
+                    "flex-shrink-0 px-3 py-1.5 rounded-full text-xs border transition-colors",
+                    expandedScenario === i
+                      ? "bg-sky-100 border-sky-300 text-sky-700"
+                      : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-sky-50 hover:border-sky-200"
+                  )}
+                >
+                  {s.icon} {s.label}
+                </button>
+              ))}
+            </div>
+            <AnimatePresence>
+              {expandedScenario !== null && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-1.5 pt-2">
+                    {SCENARIOS[expandedScenario].questions.map((q, qi) => (
+                      <button
+                        key={qi}
+                        onClick={() => { handleSend(q); setExpandedScenario(null); }}
+                        className="text-left px-3 py-1.5 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg text-[11px] text-slate-600 transition-all"
+                      >
+                        {q.length > 40 ? q.substring(0, 40) + '...' : q}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="max-w-3xl mx-auto relative">
           <input
             type="text"
