@@ -27,7 +27,8 @@ SCENARIOS_PATH = Path(__file__).parent / "scenarios.json"
 
 
 def get_client():
-    return boto3.client("bedrock-agentcore", region_name=REGION)
+    from botocore.config import Config
+    return boto3.client("bedrock-agentcore", region_name=REGION, config=Config(read_timeout=300))
 
 
 @st.cache_data
