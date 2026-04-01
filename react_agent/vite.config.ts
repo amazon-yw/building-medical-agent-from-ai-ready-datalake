@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    allowedHosts: ['.cloudfront.net', 'all'],
     proxy: {
       '/api': 'http://localhost:3001',
     },

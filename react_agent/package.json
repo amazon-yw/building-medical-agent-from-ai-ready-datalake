@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite --port=3000 --host=0.0.0.0\" \"tsx server.ts\"",
-    "server": "tsx server.ts",
+    "dev": "concurrently \"vite --port=3000 --host=0.0.0.0\" \"python3 server.py\"",
+    "server": "python3 server.py",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist"
