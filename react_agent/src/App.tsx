@@ -275,7 +275,11 @@ export default function App() {
                 <ToolTimeline steps={msg.toolSteps} />
               )}
               <div className="markdown-body">
-                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                {msg.role === 'model' && isLoading && idx === messages.length - 1 ? (
+                  <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
+                ) : (
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                )}
               </div>
             </div>
           </motion.div>
