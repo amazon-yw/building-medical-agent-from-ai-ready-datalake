@@ -152,26 +152,26 @@ export default function App() {
   const ToolTimeline = ({ steps }: { steps: ToolStep[] }) => (
     <div className="space-y-1 my-2">
       {steps.map((step, idx) => (
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
+        <div
+          key={`${step.name}-${idx}`}
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
+            "px-3 py-1.5 rounded-lg text-xs",
             step.done
               ? step.isError ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"
               : "bg-blue-50 border border-blue-200"
           )}
         >
-          {step.done ? (
-            step.isError ? <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-          ) : (
-            <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-          )}
-          <span className="font-semibold text-slate-700">{step.name || `Step ${idx + 1}`}</span>
-          {step.input && <span className="text-slate-400 text-[10px] font-mono break-all">{step.input}</span>}
-          {step.result && <span className="text-slate-500 ml-auto text-[10px]">{step.result}</span>}
-        </motion.div>
+          <div className="flex items-center gap-2">
+            {step.done ? (
+              step.isError ? <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+            ) : (
+              <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            )}
+            <span className="font-semibold text-slate-700">{step.name || `Step ${idx + 1}`}</span>
+            {step.result && <span className="text-slate-500 ml-auto text-[10px] flex-shrink-0">{step.result}</span>}
+          </div>
+          {step.input && <div className="text-slate-400 text-[10px] font-mono mt-1 break-all overflow-hidden max-h-[3rem]">{step.input}</div>}
+        </div>
       ))}
     </div>
   );
@@ -255,7 +255,7 @@ export default function App() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className={cn(
-              "flex gap-3 max-w-3xl",
+              "flex gap-3",
               msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
             )}
           >
@@ -288,13 +288,13 @@ export default function App() {
 
         {/* Live tool steps while loading */}
         {isLoading && currentTools.length > 0 && (
-          <div className="max-w-3xl mr-auto ml-10 md:ml-11">
+          <div className="mr-auto ml-10 md:ml-11">
             <ToolTimeline steps={currentTools} />
           </div>
         )}
 
         {isLoading && currentTools.length === 0 && (
-          <div className="flex gap-3 max-w-3xl mr-auto">
+          <div className="flex gap-3 mr-auto">
             <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 animate-pulse">
               <Bot className="w-4 h-4 text-sky-400" />
             </div>
