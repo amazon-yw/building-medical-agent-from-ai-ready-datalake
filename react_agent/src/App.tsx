@@ -30,7 +30,10 @@ export default function App() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [toolSteps, setToolSteps] = useState<ToolStep[]>([]);
-  const [sessionId] = useState(() => crypto.randomUUID() + '-aaaaaaaaaa');
+  const [sessionId] = useState(() => {
+    const hex = () => Math.random().toString(16).slice(2);
+    return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`;
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
