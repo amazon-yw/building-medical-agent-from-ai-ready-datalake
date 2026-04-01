@@ -20,6 +20,14 @@ def _parse_chunk(text):
         text = text[6:]
     if not text:
         return ""
+    # Strip surrounding quotes from JSON string chunks
+    if text.startswith('"') and text.endswith('"'):
+        try:
+            text = json.loads(text)  # handles escaped chars like \n
+        except json.JSONDecodeError:
+            text = text[1:-1]
+    if not text:
+        return ""
     try:
         if text.startswith("{"):
             data = json.loads(text)
