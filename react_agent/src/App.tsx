@@ -8,58 +8,9 @@ import remarkGfm from 'remark-gfm';
 import { cn } from './lib/utils';
 import { streamAgentResponse, ChatMessage } from './services/agent';
 import { motion, AnimatePresence } from 'motion/react';
+import { t } from './i18n';
 
-const SCENARIOS = [
-  {
-    icon: "🩺", label: "외래 진료",
-    questions: [
-      "오늘 외래에 당뇨 진단받은 50대 환자가 있는데, 목록 좀 보여줘.",
-      "Lucien Wiegand 환자 상태 요약해줘.",
-      "Lucien Wiegand 환자 최근 혈당 수치 추이가 어떻게 돼?",
-      "Lucien Wiegand 환자가 지금 복용 중인 약은?",
-    ]
-  },
-  {
-    icon: "🏥", label: "입원 회진",
-    questions: [
-      "현재 입원 중인 환자 목록 좀 보여줘.",
-      "Denna Krajcik 환자 진단 이력 보여줘.",
-      "Denna Krajcik 환자한테 투여 중인 약물이랑 투약 기록 확인해줘.",
-    ]
-  },
-  {
-    icon: "📋", label: "퇴원 요약",
-    questions: [
-      "퇴원 예정인 Pedro Keebler 환자의 종합 요약 보여줘.",
-      "Pedro Keebler 환자의 입원 기간 동안 진료 이력을 정리해줘.",
-      "Pedro Keebler 환자 퇴원 시 가져갈 처방 약물 목록 정리해줘.",
-    ]
-  },
-  {
-    icon: "💊", label: "처방 검토",
-    questions: [
-      "Cary Becker 환자가 현재 복용 중인 약물 전체 목록 보여줘.",
-      "우리 병원에서 가장 많이 처방되는 약물 top 10이 뭐야?",
-      "메트포르민과 SGLT2 억제제 병용 요법에 대한 최신 연구 결과 알려줘.",
-    ]
-  },
-  {
-    icon: "📊", label: "경영 분석",
-    questions: [
-      "데이터 레이크에 어떤 테이블들이 있는지 알려줘.",
-      "연령대별 당뇨 유병률 분석해줘.",
-      "최근 응급실 방문 환자 수와 주요 진단명 top 5 알려줘.",
-    ]
-  },
-  {
-    icon: "📚", label: "PubMed 검색",
-    questions: [
-      "제2형 당뇨병 최신 치료 가이드라인 관련 논문 찾아줘.",
-      "메트포르민과 SGLT2 억제제 병용 요법에 대한 연구 결과 알려줘.",
-      "이 중에서 가장 관련 있는 논문 상세 내용 보여줘.",
-    ]
-  },
-];
+const SCENARIOS = t.scenarioItems;
 
 interface ToolStep {
   name: string;
@@ -167,7 +118,7 @@ export default function App() {
             ) : (
               <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
             )}
-            <span className="font-semibold text-slate-700">{step.name || `Step ${idx + 1}`}</span>
+            <span className="font-semibold text-slate-700">{step.name || `${t.step} ${idx + 1}`}</span>
             {step.result && <span className="text-slate-500 ml-auto text-[10px] flex-shrink-0">{step.result}</span>}
           </div>
           {step.input && <div className="text-slate-400 text-[10px] font-mono mt-1 break-all overflow-hidden max-h-[3rem]">{step.input}</div>}
@@ -195,7 +146,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar — Scenarios */}
         <aside className="w-72 flex-shrink-0 border-r border-slate-200 bg-white overflow-y-auto p-3 space-y-2">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">💡 데모 시나리오</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">{t.scenarios}</h3>
           {SCENARIOS.map((s, i) => (
             <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
               <button
@@ -235,7 +186,7 @@ export default function App() {
               onClick={() => { setMessages([]); setCurrentTools([]); setExpandedScenario(null); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> 대화 초기화
+              <RefreshCw className="w-3.5 h-3.5" /> {t.reset}
             </button>
           </div>
         </aside>
@@ -249,8 +200,8 @@ export default function App() {
               <Bot className="w-12 h-12 text-sky-600" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-slate-800">무엇을 도와드릴까요?</h2>
-              <p className="text-slate-500 text-sm">좌측 시나리오를 선택하거나 직접 질문하세요.</p>
+              <h2 className="text-xl font-bold text-slate-800">{t.welcome}</h2>
+              <p className="text-slate-500 text-sm">{t.welcomeSub}</p>
             </div>
           </div>
         )}
@@ -308,7 +259,7 @@ export default function App() {
               <div className="w-2 h-2 bg-sky-400 rounded-full animate-bounce" />
               <div className="w-2 h-2 bg-sky-400 rounded-full animate-bounce [animation-delay:0.2s]" />
               <div className="w-2 h-2 bg-sky-400 rounded-full animate-bounce [animation-delay:0.4s]" />
-              <span className="text-xs text-slate-400 ml-2">분석 중...</span>
+              <span className="text-xs text-slate-400 ml-2">{t.analyzing}</span>
             </div>
           </div>
         )}
@@ -321,7 +272,7 @@ export default function App() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="의료 데이터에 대해 질문하세요..."
+            placeholder={t.placeholder}
             disabled={isLoading}
             className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 md:py-4 pl-4 md:pl-6 pr-12 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-slate-800 text-sm disabled:opacity-50"
           />
