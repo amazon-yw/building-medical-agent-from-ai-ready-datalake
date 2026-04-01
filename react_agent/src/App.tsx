@@ -160,17 +160,17 @@ export default function App() {
             "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
             step.done
               ? step.isError ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"
-              : "bg-blue-50 border border-blue-200 animate-pulse"
+              : "bg-blue-50 border border-blue-200"
           )}
         >
           {step.done ? (
             step.isError ? <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
           ) : (
-            <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 animate-spin" />
+            <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
           )}
           <span className="font-semibold text-slate-700">{step.name || `Step ${idx + 1}`}</span>
-          {step.input && <span className="text-slate-400 truncate max-w-[200px] text-[10px] font-mono">{step.input}</span>}
-          {step.result && <span className="text-slate-500 truncate max-w-[250px] ml-auto">{step.result}</span>}
+          {step.input && <span className="text-slate-400 text-[10px] font-mono break-all">{step.input}</span>}
+          {step.result && <span className="text-slate-500 ml-auto text-[10px]">{step.result}</span>}
         </motion.div>
       ))}
     </div>
@@ -266,7 +266,7 @@ export default function App() {
               {msg.role === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-sky-600" />}
             </div>
             <div className={cn(
-              "space-y-1 p-3 md:p-4 rounded-2xl shadow-sm text-sm max-w-[85%]",
+              "space-y-1 p-3 md:p-4 rounded-2xl shadow-sm text-sm w-full",
               msg.role === 'user'
                 ? "bg-sky-600 text-white rounded-tr-none"
                 : "bg-white border border-slate-200 rounded-tl-none"
