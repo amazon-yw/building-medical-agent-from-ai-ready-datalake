@@ -1,8 +1,10 @@
 """Proxy server for AgentCore Runtime"""
 import os, json, re, boto3
 from flask import Flask, request, Response
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 AGENT_ARN = os.getenv("AGENT_ARN", "")
@@ -13,7 +15,6 @@ def get_client():
 
 
 def _parse_chunk(text):
-    """Extract text from a streaming chunk."""
     text = text.strip()
     if text.startswith("data: "):
         text = text[6:]
@@ -35,12 +36,8 @@ def _parse_chunk(text):
     return text
 
 
-def _clean(text):
-    if not text:
-        return text
-    text = re.sub(r'"\s*"', "", text)
-    text = text.replace("\\n", "\n").replace("\\t", "\t")
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
+def _send(data):
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -50,7 +47,7 @@ def chat():
     session_id = data.get("sessionId", "default")
 
     if not AGENT_ARN:
-        return Response('data: {"error": "AGENT_ARN not set"}\n\n', content_type="text/event-stream")
+        return Response(_send({"type": "error", "content": "AGENT_ARN not set"}), content_type="text/event-stream")
 
     def generate():
         try:
@@ -65,7 +62,6 @@ def chat():
             content_type = resp.get("contentType", "")
 
             if "text/event-stream" in content_type:
-                buf = ""
                 for line in resp["response"].iter_lines(chunk_size=1):
                     if not line:
                         continue
@@ -74,36 +70,28 @@ def chat():
                     if not parsed:
                         continue
 
-                    # Tool markers — send as separate events
-                    if parsed.startswith("🔧") or parsed.startswith("📥") or "Result:" in parsed:
-                        if buf:
-                            yield f"data: {json.dumps({'type': 'text', 'content': _clean(buf)})}\n\n"
-                            buf = ""
-                        if parsed.startswith("🔧"):
-                            name = parsed.replace("🔧", "").strip().split("\n")[0].strip("* ")
-                            yield f"data: {json.dumps({'type': 'tool_call', 'name': name})}\n\n"
-                        elif parsed.startswith("📥"):
-                            inp = parsed.replace("📥", "").strip().lstrip(" Input:").strip("`")
-                            yield f"data: {json.dumps({'type': 'tool_input', 'input': inp})}\n\n"
-                        elif "Result:" in parsed:
-                            is_error = parsed.startswith("❌")
-                            result = parsed.split("Result:", 1)[-1].strip()
-                            yield f"data: {json.dumps({'type': 'tool_result', 'result': result, 'isError': is_error})}\n\n"
-                        continue
-
-                    buf += parsed
-
-                if buf:
-                    yield f"data: {json.dumps({'type': 'text', 'content': _clean(buf)})}\n\n"
+                    if parsed.startswith("🔧"):
+                        name = parsed.replace("🔧", "").strip().split("\n")[0].strip("* ")
+                        yield _send({"type": "tool_call", "name": name})
+                    elif parsed.startswith("📥"):
+                        inp = parsed.replace("📥", "").strip().lstrip(" Input:").strip("`")
+                        yield _send({"type": "tool_input", "input": inp})
+                    elif "Result:" in parsed:
+                        is_error = parsed.startswith("❌")
+                        result = parsed.split("Result:", 1)[-1].strip()
+                        yield _send({"type": "tool_result", "result": result, "isError": is_error})
+                    else:
+                        # Send each text chunk individually for streaming
+                        yield _send({"type": "text", "content": parsed})
             else:
                 raw = resp["response"].read()
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8")
-                yield f"data: {json.dumps({'type': 'text', 'content': raw})}\n\n"
+                yield _send({"type": "text", "content": raw})
 
-            yield "data: {\"type\": \"done\"}\n\n"
+            yield _send({"type": "done"})
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            yield _send({"type": "error", "content": str(e)})
 
     return Response(generate(), content_type="text/event-stream")
 

@@ -104,44 +104,45 @@ export default function App() {
     let buf = '';
     const tools: ToolStep[] = [];
 
+    const updateLast = (text: string, ts?: ToolStep[]) => {
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'model') {
+          return [...prev.slice(0, -1), { ...last, text, toolSteps: ts ? [...ts] : last.toolSteps }];
+        }
+        return [...prev, { role: 'model', text, toolSteps: ts }];
+      });
+    };
+
     try {
       await streamAgentResponse(
         msg,
         sessionId,
         (chunk) => {
           buf += chunk;
-          setMessages(prev => {
-            const last = prev[prev.length - 1];
-            if (last?.role === 'model') {
-              return [...prev.slice(0, -1), { ...last, text: buf, toolSteps: [...tools] }];
-            }
-            return [...prev, { role: 'model', text: buf, toolSteps: [...tools] }];
-          });
+          updateLast(buf);
         },
         (name) => {
+          // Save current text, start new bubble
+          if (buf.trim()) {
+            updateLast(buf);
+          }
+          buf = '';
           tools.push({ name, done: false });
           setCurrentTools([...tools]);
+          setMessages(prev => [...prev, { role: 'model', text: '', toolSteps: [] }]);
         },
         (result, isError) => {
           const last = tools[tools.length - 1];
-          if (last) {
-            last.result = result;
-            last.isError = isError;
-            last.done = true;
-          }
+          if (last) { last.result = result; last.isError = isError; last.done = true; }
           setCurrentTools([...tools]);
+          updateLast(buf, tools);
         }
       );
     } catch (error: any) {
       buf += `\n\n❌ 오류: ${error.message}`;
     } finally {
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === 'model') {
-          return [...prev.slice(0, -1), { ...last, text: buf, toolSteps: [...tools] }];
-        }
-        return [...prev, { role: 'model', text: buf, toolSteps: [...tools] }];
-      });
+      if (buf.trim()) updateLast(buf, tools);
       setIsLoading(false);
       setCurrentTools([]);
     }
@@ -182,8 +183,8 @@ export default function App() {
             <Stethoscope className="text-white w-5 h-5 md:w-6 md:h-6" />
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">Medical AI Agent</h1>
-            <p className="text-[10px] md:text-xs text-slate-500 font-medium">FHIR Data Lake · AgentCore · MCP Server</p>
+            <h1 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">🏥 Medical AI Agent</h1>
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium">AI-ready Data Lake · AgentCore · MCP Server</p>
           </div>
         </div>
         <button

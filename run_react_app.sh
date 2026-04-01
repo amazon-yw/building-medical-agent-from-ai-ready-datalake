@@ -10,6 +10,6 @@ fi
 echo "AGENT_ARN: $AGENT_ARN"
 
 cd "$(dirname "$0")/react_agent"
-pip install -q flask boto3 2>/dev/null
+pip install -q flask flask-cors boto3 2>/dev/null
 npm install --silent 2>/dev/null
 npm run dev
