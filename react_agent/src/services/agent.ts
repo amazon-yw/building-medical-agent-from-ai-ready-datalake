@@ -35,35 +35,32 @@ export async function streamAgentResponse(
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw) continue;
+      const text = line.slice(6);
 
-      try {
-        const event = JSON.parse(raw);
-        switch (event.type) {
-          case "text":
-            onText(event.content || "");
-            break;
-          case "tool_call":
-            onToolCall?.(event.name || "");
-            break;
-          case "tool_input":
-            // skip for now, could display if needed
-            break;
-          case "tool_result":
-            onToolResult?.(event.result || "", event.isError || false);
-            break;
-          case "error":
-            onText(`\n\n❌ Error: ${event.content}`);
-            break;
-          case "done":
-            onDone?.();
-            break;
-        }
-      } catch {
-        // non-JSON line, treat as text
-        onText(raw);
+      if (text === "[DONE]") {
+        onDone?.();
+        continue;
       }
+      if (text.startsWith("[ERROR]")) {
+        onText(`\n\n❌ ${text}`);
+        continue;
+      }
+
+      // Detect tool markers
+      if (text.startsWith("🔧")) {
+        const name = text.replace("🔧", "").trim().split("\n")[0].replace(/\*/g, "").trim();
+        onToolCall?.(name);
+        continue;
+      }
+      if (text.startsWith("📥")) continue;
+      if (text.includes("Result:")) {
+        const isError = text.startsWith("❌");
+        const result = text.split("Result:")[1]?.trim() || "";
+        onToolResult?.(result, isError);
+        continue;
+      }
+
+      onText(text);
     }
   }
 }

@@ -1,5 +1,5 @@
 """Proxy server for AgentCore Runtime"""
-import os, json, re, boto3
+import os, json, boto3
 from flask import Flask, request, Response
 from flask_cors import CORS
 
@@ -36,10 +36,6 @@ def _parse_chunk(text):
     return text
 
 
-def _send(data):
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.json
@@ -47,7 +43,7 @@ def chat():
     session_id = data.get("sessionId", "default")
 
     if not AGENT_ARN:
-        return Response(_send({"type": "error", "content": "AGENT_ARN not set"}), content_type="text/event-stream")
+        return Response("data: [ERROR] AGENT_ARN not set\n\n", content_type="text/event-stream")
 
     def generate():
         try:
@@ -59,39 +55,26 @@ def chat():
                 contentType="application/json",
                 accept="application/json",
             )
-            content_type = resp.get("contentType", "")
+            ct = resp.get("contentType", "")
 
-            if "text/event-stream" in content_type:
+            if "text/event-stream" in ct:
                 for line in resp["response"].iter_lines(chunk_size=1):
                     if not line:
                         continue
                     text = line.decode("utf-8") if isinstance(line, bytes) else line
                     parsed = _parse_chunk(text)
-                    if not parsed:
-                        continue
-
-                    if parsed.startswith("🔧"):
-                        name = parsed.replace("🔧", "").strip().split("\n")[0].strip("* ")
-                        yield _send({"type": "tool_call", "name": name})
-                    elif parsed.startswith("📥"):
-                        inp = parsed.replace("📥", "").strip().lstrip(" Input:").strip("`")
-                        yield _send({"type": "tool_input", "input": inp})
-                    elif "Result:" in parsed:
-                        is_error = parsed.startswith("❌")
-                        result = parsed.split("Result:", 1)[-1].strip()
-                        yield _send({"type": "tool_result", "result": result, "isError": is_error})
-                    else:
-                        # Send each text chunk individually for streaming
-                        yield _send({"type": "text", "content": parsed})
+                    if parsed:
+                        # Pass through as plain text SSE
+                        yield f"data: {parsed}\n\n"
             else:
                 raw = resp["response"].read()
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8")
-                yield _send({"type": "text", "content": raw})
+                yield f"data: {raw}\n\n"
 
-            yield _send({"type": "done"})
+            yield "data: [DONE]\n\n"
         except Exception as e:
-            yield _send({"type": "error", "content": str(e)})
+            yield f"data: [ERROR] {str(e)}\n\n"
 
     return Response(generate(), content_type="text/event-stream")
 
