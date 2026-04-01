@@ -1,19 +1,17 @@
 export interface ChatMessage {
   role: "user" | "model";
   text: string;
-  toolCalls?: { name: string; input: string; result: string; elapsed: string; isError: boolean }[];
 }
-
-const API_URL = "";
 
 export async function streamAgentResponse(
   prompt: string,
   sessionId: string,
-  onChunk: (chunk: string) => void,
+  onText: (text: string) => void,
   onToolCall?: (name: string) => void,
-  onToolResult?: (name: string, result: string, elapsed: string, isError: boolean) => void
+  onToolResult?: (result: string, isError: boolean) => void,
+  onDone?: () => void
 ): Promise<void> {
-  const resp = await fetch(`${API_URL}/api/chat`, {
+  const resp = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt, sessionId }),
@@ -26,7 +24,6 @@ export async function streamAgentResponse(
 
   const decoder = new TextDecoder();
   let buffer = "";
-  let toolStart = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -38,39 +35,35 @@ export async function streamAgentResponse(
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
-      let text = line.slice(6).trim();
-      if (!text) continue;
+      const raw = line.slice(6).trim();
+      if (!raw) continue;
 
-      // Try to parse JSON chunks
       try {
-        const parsed = JSON.parse(text);
-        if (parsed.error) {
-          onChunk(`\n\n❌ Error: ${parsed.error}`);
-          continue;
+        const event = JSON.parse(raw);
+        switch (event.type) {
+          case "text":
+            onText(event.content || "");
+            break;
+          case "tool_call":
+            onToolCall?.(event.name || "");
+            break;
+          case "tool_input":
+            // skip for now, could display if needed
+            break;
+          case "tool_result":
+            onToolResult?.(event.result || "", event.isError || false);
+            break;
+          case "error":
+            onText(`\n\n❌ Error: ${event.content}`);
+            break;
+          case "done":
+            onDone?.();
+            break;
         }
-        text = parsed.content || parsed.response || parsed.text || text;
       } catch {
-        // plain text, use as-is
+        // non-JSON line, treat as text
+        onText(raw);
       }
-
-      // Tool call markers
-      if (text.startsWith("🔧")) {
-        const name = text.replace("🔧", "").trim().split("\n")[0].replace(/\*/g, "").trim();
-        toolStart = Date.now();
-        onToolCall?.(name);
-        continue;
-      }
-      if (text.startsWith("📥")) continue; // tool input, skip for now
-      if (text.includes("Result:")) {
-        const elapsed = toolStart ? `${((Date.now() - toolStart) / 1000).toFixed(1)}s` : "";
-        const isError = text.startsWith("❌");
-        const result = text.split("Result:")[1]?.trim() || "";
-        onToolResult?.("", result, elapsed, isError);
-        toolStart = 0;
-        continue;
-      }
-
-      onChunk(text);
     }
   }
 }
