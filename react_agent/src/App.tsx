@@ -122,13 +122,13 @@ export default function App() {
           buf += chunk;
           updateLast(buf);
         },
-        (name) => {
-          // Save current text, start new bubble
+        (name: string, toolInput: string) => {
+          // New tool call
           if (buf.trim()) {
             updateLast(buf);
           }
           buf = '';
-          tools.push({ name, done: false });
+          tools.push({ name, input: toolInput, done: false });
           setCurrentTools([...tools]);
           setMessages(prev => [...prev, { role: 'model', text: '', toolSteps: [] }]);
         },
@@ -168,6 +168,7 @@ export default function App() {
             <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 animate-spin" />
           )}
           <span className="font-semibold text-slate-700">{step.name || `Step ${idx + 1}`}</span>
+          {step.input && <span className="text-slate-400 truncate max-w-[200px] text-[10px] font-mono">{step.input}</span>}
           {step.result && <span className="text-slate-500 truncate max-w-[250px] ml-auto">{step.result}</span>}
         </motion.div>
       ))}
@@ -273,7 +274,7 @@ export default function App() {
               {msg.role === 'model' && msg.toolSteps && msg.toolSteps.length > 0 && (
                 <ToolTimeline steps={msg.toolSteps} />
               )}
-              <div className="prose prose-sm max-w-none prose-slate">
+              <div className="markdown-body">
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
               </div>
             </div>

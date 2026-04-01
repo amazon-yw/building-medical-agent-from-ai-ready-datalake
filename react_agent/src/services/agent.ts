@@ -7,7 +7,7 @@ export async function streamAgentResponse(
   prompt: string,
   sessionId: string,
   onText: (text: string) => void,
-  onToolCall?: (name: string) => void,
+  onToolCall?: (name: string, input: string) => void,
   onToolResult?: (result: string, isError: boolean) => void,
   onDone?: () => void
 ): Promise<void> {
@@ -35,31 +35,38 @@ export async function streamAgentResponse(
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
-      const text = line.slice(6);
+      let text = line.slice(6);
 
-      if (text === "[DONE]") {
-        onDone?.();
-        continue;
-      }
-      if (text.startsWith("[ERROR]")) {
-        onText(`\n\n❌ ${text}`);
+      if (text === "[DONE]") { onDone?.(); continue; }
+      if (text.startsWith("[ERROR]")) { onText(`\n\n❌ ${text}`); continue; }
+
+      // Check for embedded tool markers within the text
+      // Pattern: \n\n🔧 **tool_name**\n📥 Input: `{...}`\n
+      const toolCallMatch = text.match(/🔧\s*\*{0,2}(\w+)\*{0,2}/);
+      const toolInputMatch = text.match(/📥\s*Input:\s*`?({[^`]*})`?/);
+      const toolResultMatch = text.match(/(✅|❌)\s*Result:\s*(.*)/);
+
+      if (toolCallMatch) {
+        // Split: text before tool marker goes as text, tool marker as tool_call
+        const idx = text.indexOf("🔧");
+        const before = text.substring(0, idx).replace(/\\n/g, "\n").trim();
+        if (before) onText(before);
+
+        const name = toolCallMatch[1];
+        const input = toolInputMatch ? toolInputMatch[1] : "";
+        onToolCall?.(name, input);
         continue;
       }
 
-      // Detect tool markers
-      if (text.startsWith("🔧")) {
-        const name = text.replace("🔧", "").trim().split("\n")[0].replace(/\*/g, "").trim();
-        onToolCall?.(name);
-        continue;
-      }
-      if (text.startsWith("📥")) continue;
-      if (text.includes("Result:")) {
-        const isError = text.startsWith("❌");
-        const result = text.split("Result:")[1]?.trim() || "";
+      if (toolResultMatch) {
+        const isError = toolResultMatch[1] === "❌";
+        const result = toolResultMatch[2].trim();
         onToolResult?.(result, isError);
         continue;
       }
 
+      // Regular text - unescape \n
+      text = text.replace(/\\n/g, "\n");
       onText(text);
     }
   }
