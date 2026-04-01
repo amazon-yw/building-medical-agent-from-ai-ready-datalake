@@ -26,7 +26,6 @@ AGENT_ARN = os.getenv("AGENT_ARN", "")
 SCENARIOS_PATH = Path(__file__).parent / "scenarios.json"
 
 
-@st.cache_resource
 def get_client():
     return boto3.client("bedrock-agentcore", region_name=REGION)
 
