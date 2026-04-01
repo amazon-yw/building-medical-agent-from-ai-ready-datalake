@@ -37,19 +37,21 @@ export async function streamAgentResponse(
       if (!line.startsWith("data: ")) continue;
       let text = line.slice(6);
 
+      // Restore newlines from server token
+      text = text.replace(/%%NL%%/g, "\n");
+
       if (text === "[DONE]") { onDone?.(); continue; }
       if (text.startsWith("[ERROR]")) { onText(`\n\n❌ ${text}`); continue; }
 
       // Check for embedded tool markers within the text
-      // Pattern: \n\n🔧 **tool_name**\n📥 Input: `{...}`\n
+      // Pattern: 🔧 **tool_name** or 🔧 tool_name
       const toolCallMatch = text.match(/🔧\s*\*{0,2}(\w+)\*{0,2}/);
       const toolInputMatch = text.match(/📥\s*Input:\s*`?({[^`]*})`?/);
       const toolResultMatch = text.match(/(✅|❌)\s*Result:\s*(.*)/);
 
       if (toolCallMatch) {
-        // Split: text before tool marker goes as text, tool marker as tool_call
         const idx = text.indexOf("🔧");
-        const before = text.substring(0, idx).replace(/\\n/g, "\n").trim();
+        const before = text.substring(0, idx).trim();
         if (before) onText(before);
 
         const name = toolCallMatch[1];

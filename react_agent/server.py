@@ -26,6 +26,8 @@ def _parse_chunk(text):
             text = json.loads(text)  # handles escaped chars like \n
         except json.JSONDecodeError:
             text = text[1:-1]
+    # Also handle literal \n that survived
+    text = text.replace("\\n", "\n").replace("\\t", "\t")
     if not text:
         return ""
     try:
@@ -72,8 +74,10 @@ def chat():
                     text = line.decode("utf-8") if isinstance(line, bytes) else line
                     parsed = _parse_chunk(text)
                     if parsed:
-                        # Pass through as plain text SSE
-                        yield f"data: {parsed}\n\n"
+                        # SSE cannot have real newlines in data line
+                        # Replace newlines with a token the frontend will restore
+                        safe = parsed.replace("\n", "%%NL%%")
+                        yield f"data: {safe}\n\n"
             else:
                 raw = resp["response"].read()
                 if isinstance(raw, bytes):
