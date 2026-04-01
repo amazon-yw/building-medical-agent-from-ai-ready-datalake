@@ -4,6 +4,7 @@ import {
   RefreshCw, Info, Wrench, Check, X, ChevronDown, ChevronRight
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from './lib/utils';
 import { streamAgentResponse, ChatMessage } from './services/agent';
 import { motion, AnimatePresence } from 'motion/react';
@@ -278,7 +279,7 @@ export default function App() {
                 {msg.role === 'model' && isLoading && idx === messages.length - 1 ? (
                   <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
                 ) : (
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                 )}
               </div>
             </div>
