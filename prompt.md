@@ -274,6 +274,21 @@ spark.sql(<create statement>)
 ### SQL Statement Rules
 - Execute `CREATE TABLE` statements using `spark.sql()` method
 - Make sure no SQL statements contain backslashes
+- 테이블 생성 쿼리는 `CREAT TABLE` 구문 다음에 `USING iceberg` -> `COMMENT` -> `TBLPROPERTIES` 순으로 구성
+- CREAT TABLE 쿼리 예는 다음과 같음
+```
+CREATE TABLE IF NOT EXISTS <table_name> (
+    <columns>
+    ...
+)
+USING iceberg
+COMMENT '<comment>'
+TBLPROPERTIES (
+    'fhir_resource' = '<resource>',
+    'domain' = '<domain>',
+    'sub_domain' = '<sub_domain>'
+)
+```
 - Wrap `COMMENT` values in single quotes, and ensure no special characters (apostrophes, backslashes, newlines) appear inside them — use a sanitize function to clean descriptions
 - Use `CREATE TABLE IF NOT EXISTS` for idempotent execution
 
