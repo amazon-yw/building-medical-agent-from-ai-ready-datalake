@@ -266,6 +266,21 @@ spark.sql(<create statement>)
 ### SQL 문 규칙
 - `spark.sql()` 메서드를 사용하여 `CREATE TABLE` 문 실행
 - SQL 문에 백슬래시가 포함되지 않도록 할 것
+- 테이블 생성 쿼리는 `CREAT TABLE` 구문 다음에 `USING iceberg` -> `COMMENT` -> `TBLPROPERTIES` 순으로 구성
+- CREAT TABLE 쿼리 예는 다음과 같음
+```
+CREATE TABLE IF NOT EXISTS <table_name> (
+    <columns>
+    ...
+)
+USING iceberg
+COMMENT '<comment>'
+TBLPROPERTIES (
+    'fhir_resource' = '<resource>',
+    'domain' = '<domain>',
+    'sub_domain' = '<sub_domain>'
+)
+```
 - `COMMENT` 값은 작은따옴표로 감싸고, 내부에 특수 문자(아포스트로피, 백슬래시, 개행)가 나타나지 않도록 — 설명을 정리하는 sanitize 함수 사용
 - 멱등 실행을 위해 `CREATE TABLE IF NOT EXISTS` 사용
 
