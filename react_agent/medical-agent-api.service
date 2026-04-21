@@ -1,0 +1,21 @@
+[Unit]
+Description=Medical Agent Flask API
+After=network.target
+
+[Service]
+Type=simple
+User=participant
+WorkingDirectory=/workshop/react_agent
+EnvironmentFile=/workshop/react_agent/.env
+ExecStart=/usr/bin/python3 -m gunicorn \
+    --bind 127.0.0.1:3001 \
+    --workers 1 \
+    --worker-class gevent \
+    --timeout 300 \
+    --keep-alive 5 \
+    server:app
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

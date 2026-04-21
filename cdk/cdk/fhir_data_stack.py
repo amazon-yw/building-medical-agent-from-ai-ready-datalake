@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_lakeformation as lakeformation,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
+    aws_cognito as cognito,
     aws_secretsmanager as secretsmanager,
     aws_ssm as ssm,
     aws_sso as sso,
@@ -1322,16 +1323,24 @@ def handler(event, context):
         # Secrets Manager read for DB credentials
         db_cluster.secret.grant_read(code_editor_role)
 
-        # Security Group - allow CloudFront origin-facing
+        # Security Group - allow CloudFront origin-facing only
         code_editor_sg = ec2.SecurityGroup(self, "CodeEditorSG",
             vpc=vpc,
             description="Code Editor - CloudFront ingress only",
             allow_all_outbound=True
         )
+        # CloudFront managed prefix list (region-specific)
+        cf_prefix_list_ids = {
+            "us-east-1": "pl-3b927c52",
+            "us-west-2": "pl-82a045eb",
+            "eu-west-1": "pl-4fa04526",
+            "ap-northeast-1": "pl-58a04531",
+        }
+        cf_prefix_list_id = cf_prefix_list_ids.get(self.region, "pl-3b927c52")
         code_editor_sg.add_ingress_rule(
-            ec2.Peer.any_ipv4(),
+            ec2.Peer.prefix_list(cf_prefix_list_id),
             ec2.Port.tcp(80),
-            "CloudFront origin-facing"
+            "CloudFront origin-facing only"
         )
 
         # EC2 Instance
@@ -1538,6 +1547,55 @@ def handler(event, context):
             value=f"https://{cf_distribution.distribution_domain_name}/?folder={home_folder}&tkn=" + secret_plaintext.get_att_string("password")
         )
 
+        # ============================================================
+        # Cognito User Pool for React App
+        # ============================================================
+        react_app_url = f"https://{cf_distribution.distribution_domain_name}/app"
+
+        user_pool = cognito.UserPool(self, "MedicalAgentUserPool",
+            user_pool_name="medical-agent-users",
+            self_sign_up_enabled=False,
+            sign_in_aliases=cognito.SignInAliases(email=True, username=True),
+            password_policy=cognito.PasswordPolicy(
+                min_length=8,
+                require_uppercase=True,
+                require_digits=True,
+                require_symbols=False,
+            ),
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        user_pool_domain = user_pool.add_domain("ReactAppUserPoolDomain",
+            cognito_domain=cognito.CognitoDomainOptions(
+                domain_prefix=f"medical-agent-{account_id}"
+            )
+        )
+
+        legacy_app_url = f"https://{cf_distribution.distribution_domain_name}/app-legacy"
+
+        user_pool_client = user_pool.add_client("ReactAppClient",
+            user_pool_client_name="medical-agent-react",
+            generate_secret=False,
+            auth_flows=cognito.AuthFlow(user_srp=True),
+            o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(authorization_code_grant=True),
+                scopes=[cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+                callback_urls=[react_app_url, legacy_app_url, "http://localhost:3000/app", "http://localhost:3000/app-legacy"],
+                logout_urls=[react_app_url, legacy_app_url, "http://localhost:3000/app", "http://localhost:3000/app-legacy"],
+            ),
+            supported_identity_providers=[cognito.UserPoolClientIdentityProvider.COGNITO],
+            access_token_validity=Duration.hours(1),
+            id_token_validity=Duration.hours(1),
+            refresh_token_validity=Duration.days(30),
+        )
+
+        CfnOutput(self, "CognitoUserPoolId", value=user_pool.user_pool_id)
+        CfnOutput(self, "CognitoClientId", value=user_pool_client.user_pool_client_id)
+        CfnOutput(self, "CognitoDomain",
+            value=f"https://{user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com"
+        )
+        CfnOutput(self, "ReactAppURL", value=react_app_url)
+
         # Grant Code Editor role EMR Serverless permissions
         code_editor_role.add_to_policy(iam.PolicyStatement(
             actions=["iam:PassRole"],
@@ -1563,64 +1621,58 @@ def handler(event, context):
             ],
             resources=[f"arn:aws:emr-serverless:{self.region}:{self.account}:/applications/*"]
         ))
-
-        # ============================================================
+        #         # ============================================================
         # IAM Identity Center (SSO) + Q Developer Pro
         # ============================================================
-
-        # SSO Instance
-        sso_instance = sso.CfnInstance(self, "SSOInstance")
-
-        # Lambda role for IDC setup
-        idc_lambda_role = iam.Role(self, "IDCLambdaRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-                iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
-            ],
-        )
-        idc_lambda_role.add_to_policy(iam.PolicyStatement(
-            actions=[
-                "sso:DescribeInstance", "sso:ListInstances",
-                "identitystore:CreateGroup", "identitystore:CreateGroupMembership",
-                "identitystore:CreateUser", "identitystore:ListUsers", "identitystore:ListGroups",
-            ],
-            resources=[
-                sso_instance.attr_instance_arn,
-                f"arn:aws:identitystore::{self.account}:identitystore/*",
-                "arn:aws:identitystore:::*",
-            ],
-        ))
-
-        # Lambda to create IDC user, group, Q Developer Pro profile
-        idc_lambda = lambda_.Function(self, "IDCSetupLambda",
-            runtime=lambda_.Runtime.PYTHON_3_10,
-            handler="index.handler",
-            timeout=Duration.minutes(5),
-            role=idc_lambda_role,
-            code=lambda_.Code.from_inline(open(
-                os.path.join(os.path.dirname(__file__), "idc_setup_handler.py")
-            ).read()),
-        )
-
-        # Custom resource to trigger IDC setup
-        idc_setup = CustomResource(self, "IDCSetup",
-            service_token=idc_lambda.function_arn,
-            properties={
-                "InstanceArn": sso_instance.attr_instance_arn,
-                "IdentityStoreId": sso_instance.attr_identity_store_id,
-            },
-        )
-        idc_setup.node.add_dependency(sso_instance)
-
-        # Outputs
-        CfnOutput(self, "IDCUsername", value="qdev")
-        CfnOutput(self, "IDCUserEmail", value="qdev@example.com")
-        CfnOutput(self, "IDCStartURL",
-            value=idc_setup.get_att_string("StartURL"))
-        CfnOutput(self, "IDCPassword",
-            value=idc_setup.get_att_string("PasswordOTP"))
-        CfnOutput(self, "IDCRegion", value="us-east-1")
+        #         # SSO Instance
+        # sso_instance = sso.CfnInstance(self, "SSOInstance")
+        #         # Lambda role for IDC setup
+        # idc_lambda_role = iam.Role(self, "IDCLambdaRole",
+        # assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+        # managed_policies=[
+        # iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
+        # iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
+        # ],
+        # )
+        # idc_lambda_role.add_to_policy(iam.PolicyStatement(
+        # actions=[
+        # "sso:DescribeInstance", "sso:ListInstances",
+        # "identitystore:CreateGroup", "identitystore:CreateGroupMembership",
+        # "identitystore:CreateUser", "identitystore:ListUsers", "identitystore:ListGroups",
+        # ],
+        # resources=[
+        # sso_instance.attr_instance_arn,
+        # f"arn:aws:identitystore::{self.account}:identitystore/*",
+        # "arn:aws:identitystore:::*",
+        # ],
+        # ))
+        #         # Lambda to create IDC user, group, Q Developer Pro profile
+        # idc_lambda = lambda_.Function(self, "IDCSetupLambda",
+        # runtime=lambda_.Runtime.PYTHON_3_10,
+        # handler="index.handler",
+        # timeout=Duration.minutes(5),
+        # role=idc_lambda_role,
+        # code=lambda_.Code.from_inline(open(
+        # os.path.join(os.path.dirname(__file__), "idc_setup_handler.py")
+        # ).read()),
+        # )
+        #         # Custom resource to trigger IDC setup
+        # idc_setup = CustomResource(self, "IDCSetup",
+        # service_token=idc_lambda.function_arn,
+        # properties={
+        # "InstanceArn": sso_instance.attr_instance_arn,
+        # "IdentityStoreId": sso_instance.attr_identity_store_id,
+        # },
+        # )
+        # idc_setup.node.add_dependency(sso_instance)
+        #         # Outputs
+        # CfnOutput(self, "IDCUsername", value="qdev")
+        # CfnOutput(self, "IDCUserEmail", value="qdev@example.com")
+        # CfnOutput(self, "IDCStartURL",
+        # value=idc_setup.get_att_string("StartURL"))
+        # CfnOutput(self, "IDCPassword",
+        # value=idc_setup.get_att_string("PasswordOTP"))
+        # CfnOutput(self, "IDCRegion", value="us-east-1")
 
         # ============================================================
         # Bedrock Model Access Activation

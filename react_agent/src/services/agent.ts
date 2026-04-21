@@ -1,3 +1,5 @@
+declare const __APP_MODE__: string;
+
 export interface ChatMessage {
   role: "user" | "model";
   text: string;
@@ -9,11 +11,16 @@ export async function streamAgentResponse(
   onText: (text: string) => void,
   onToolCall?: (name: string, input: string) => void,
   onToolResult?: (result: string, isError: boolean) => void,
-  onDone?: () => void
+  onDone?: () => void,
+  accessToken?: string,
 ): Promise<void> {
-  const resp = await fetch("/api/chat", {
+  const endpoint = __APP_MODE__ === 'legacy' ? '/api/legacy/chat' : '/api/chat';
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+  const resp = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ prompt, sessionId }),
   });
 

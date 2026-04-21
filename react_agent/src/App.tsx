@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Stethoscope, Send, User, Bot,
-  RefreshCw, Info, Wrench, Check, X, ChevronDown, ChevronRight
+  RefreshCw, Info, Wrench, Check, X, ChevronDown, ChevronRight, LogOut
 } from 'lucide-react';
+import { useAuth } from './AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from './lib/utils';
@@ -145,6 +146,7 @@ interface MessageWithTools {
 }
 
 export default function App() {
+  const { tokens, email, loading, signIn, signOut, getAccessToken } = useAuth();
   const [messages, setMessages] = useState<MessageWithTools[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -161,6 +163,40 @@ export default function App() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading, currentTools]);
+
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tokens) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-6 p-8 bg-white rounded-2xl shadow-lg border border-slate-200 max-w-sm w-full mx-4">
+          <div className="bg-sky-500 p-4 rounded-2xl">
+            <Stethoscope className="w-10 h-10 text-white" />
+          </div>
+          <div className="text-center space-y-1">
+            <h1 className="text-xl font-bold text-slate-800">Medical AI Agent</h1>
+            <p className="text-sm text-slate-500">로그인하여 서비스를 이용하세요</p>
+          </div>
+          <button
+            onClick={signIn}
+            className="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors shadow-md shadow-sky-500/20"
+          >
+            Cognito로 로그인
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSend = async (text?: string) => {
     const msg = text || input.trim();
@@ -186,6 +222,7 @@ export default function App() {
     };
 
     try {
+      const accessToken = await getAccessToken() ?? undefined;
       await streamAgentResponse(
         msg,
         sessionId,
@@ -211,7 +248,9 @@ export default function App() {
           setCurrentTools([...tools]);
           const newTools = tools.slice(lastToolCount);
           updateLast(buf, newTools);
-        }
+        },
+        undefined,
+        accessToken,
       );
     } catch (error: any) {
       buf += `\n\n❌ 오류: ${error.message}`;
@@ -272,6 +311,17 @@ export default function App() {
             </h1>
             <p className="text-[10px] md:text-xs text-slate-500 font-medium">{t.subtitle}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500 hidden md:block">{email}</span>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+            title="로그아웃"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden md:block">로그아웃</span>
+          </button>
         </div>
       </header>
 
