@@ -135,7 +135,11 @@ def legacy_chat():
 
 
 def _stream_response(arn: str, prompt: str, session_id: str):
-    def generate():
+    import queue, threading
+
+    q = queue.Queue()
+
+    def producer():
         try:
             client = get_client()
             resp = client.invoke_agent_runtime(
@@ -146,7 +150,6 @@ def _stream_response(arn: str, prompt: str, session_id: str):
                 accept="application/json",
             )
             ct = resp.get("contentType", "")
-
             if "text/event-stream" in ct:
                 for line in resp["response"].iter_lines(chunk_size=1):
                     if not line:
@@ -154,17 +157,29 @@ def _stream_response(arn: str, prompt: str, session_id: str):
                     text = line.decode("utf-8") if isinstance(line, bytes) else line
                     parsed = _parse_chunk(text)
                     if parsed:
-                        safe = parsed.replace("\n", "%%NL%%")
-                        yield f"data: {safe}\n\n"
+                        q.put(f"data: {parsed.replace(chr(10), '%%NL%%')}\n\n")
             else:
                 raw = resp["response"].read()
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8")
-                yield f"data: {raw}\n\n"
-
-            yield "data: [DONE]\n\n"
+                q.put(f"data: {raw}\n\n")
+            q.put(f"data: [DONE]\n\n")
         except Exception as e:
-            yield f"data: [ERROR] {str(e)}\n\n"
+            q.put(f"data: [ERROR] {str(e)}\n\n")
+        finally:
+            q.put(None)  # sentinel
+
+    def generate():
+        t = threading.Thread(target=producer, daemon=True)
+        t.start()
+        while True:
+            try:
+                item = q.get(timeout=25)
+                if item is None:
+                    break
+                yield item
+            except queue.Empty:
+                yield ": keepalive\n\n"  # SSE comment — keeps connection alive
 
     return Response(generate(), content_type="text/event-stream")
 
