@@ -79,7 +79,9 @@ echo ">>> Build output: $DIST_DIR (main) + ${DIST_DIR}-legacy (legacy)"
 
 # ── 4. Install nginx config ───────────────────────────────────────────────────
 echo ">>> Installing nginx config..."
-sudo cp "$APP_DIR/nginx-medical-agent.conf" /etc/nginx/conf.d/medical-agent.conf
+sed "s|/workshop/react_agent|${APP_DIR}|g" \
+    "$APP_DIR/nginx-medical-agent.conf" \
+    | sudo tee /etc/nginx/conf.d/medical-agent.conf > /dev/null
 sudo rm -f /etc/nginx/conf.d/code-editor.conf 2>/dev/null || true
 sudo nginx -t
 sudo systemctl reload nginx
