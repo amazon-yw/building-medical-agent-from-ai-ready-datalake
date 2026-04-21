@@ -1593,8 +1593,8 @@ def handler(event, context):
             o_auth=cognito.OAuthSettings(
                 flows=cognito.OAuthFlows(authorization_code_grant=True),
                 scopes=[cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-                callback_urls=[react_app_url, legacy_app_url, "http://localhost:3000/app", "http://localhost:3000/app-legacy"],
-                logout_urls=[react_app_url, legacy_app_url, "http://localhost:3000/app", "http://localhost:3000/app-legacy"],
+                callback_urls=[react_app_url + "/", legacy_app_url + "/", "http://localhost:3000/app/", "http://localhost:3000/app-legacy/"],
+                logout_urls=[react_app_url + "/", legacy_app_url + "/", "http://localhost:3000/app/", "http://localhost:3000/app-legacy/"],
             ),
             supported_identity_providers=[cognito.UserPoolClientIdentityProvider.COGNITO],
             access_token_validity=Duration.hours(1),

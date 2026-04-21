@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
         userPoolId: env.VITE_COGNITO_USER_POOL_ID || '',
         clientId: env.VITE_COGNITO_CLIENT_ID || '',
         domain: env.VITE_COGNITO_DOMAIN || '',
-        redirectUri: env.VITE_COGNITO_REDIRECT_URI || (isLegacy ? 'http://localhost:3000/app-legacy' : 'http://localhost:3000/app'),
+        redirectUri: env.VITE_COGNITO_REDIRECT_URI || (isLegacy ? 'http://localhost:3000/app-legacy/' : 'http://localhost:3000/app/'),
       }),
     },
   };

@@ -53,7 +53,7 @@ LEGACY_AGENT_ARN=${LEGACY_AGENT_ARN}
 VITE_COGNITO_USER_POOL_ID=${USER_POOL_ID}
 VITE_COGNITO_CLIENT_ID=${CLIENT_ID}
 VITE_COGNITO_DOMAIN=${COGNITO_DOMAIN}
-VITE_COGNITO_REDIRECT_URI=https://${CF_DOMAIN}/app
+VITE_COGNITO_REDIRECT_URI=https://${CF_DOMAIN}/app/
 EOF
 
 echo ">>> .env written:"
@@ -72,7 +72,7 @@ npm run build
 
 echo ">>> Building React app (legacy)..."
 VITE_APP_MODE=legacy \
-VITE_COGNITO_REDIRECT_URI="https://${CF_DOMAIN}/app-legacy" \
+VITE_COGNITO_REDIRECT_URI="https://${CF_DOMAIN}/app-legacy/" \
 npm run build
 
 echo ">>> Build output: $DIST_DIR (main) + ${DIST_DIR}-legacy (legacy)"
