@@ -1529,17 +1529,30 @@ def handler(event, context):
         run_ssm.node.add_dependency(ssm_doc)
 
         # CloudFront distribution
+        ec2_origin = origins.HttpOrigin(
+            code_editor_instance.instance_public_dns_name,
+            protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY
+        )
+        react_behavior = cloudfront.BehaviorOptions(
+            origin=ec2_origin,
+            allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+            origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
+        )
         cf_distribution = cloudfront.Distribution(self, "CodeEditorCF",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.HttpOrigin(
-                    code_editor_instance.instance_public_dns_name,
-                    protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY
-                ),
+                origin=ec2_origin,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.ALLOW_ALL,
                 cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
                 origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
             ),
+            additional_behaviors={
+                "/app/*": react_behavior,
+                "/app-legacy/*": react_behavior,
+                "/api/*": react_behavior,
+            },
             http_version=cloudfront.HttpVersion.HTTP2_AND_3,
         )
 
