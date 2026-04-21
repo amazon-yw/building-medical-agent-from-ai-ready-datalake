@@ -1,4 +1,5 @@
 """EMR Serverless Livy client for executing Spark SQL queries."""
+from metadata_loader import DB
 import json
 import os
 import time
@@ -66,7 +67,7 @@ def _get_or_create_session():
     # Create new session
     data = {
         "kind": "pyspark",
-        "heartbeatTimeoutInSecond": 600,
+        "heartbeatTimeoutInSecond": 3600,
         "conf": {
             "emr-serverless.session.executionRoleArn": EXECUTION_ROLE_ARN,
             "spark.jars.packages": "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
@@ -89,6 +90,9 @@ def _get_or_create_session():
         r = _signed_request("GET", f"{ENDPOINT}/sessions/{_session_id}/state")
         state = r.json().get("state")
         if state == "idle":
+            code = f'spark.sql("USE s3tablescatalog.{DB}")'
+            _signed_request('POST', f'{ENDPOINT}/sessions/{_session_id}/statements', {'code': code})
+            time.sleep(3)
             return _session_id
         if state in ("dead", "error", "shutting_down"):
             raise RuntimeError(f"Session failed with state: {state}")
@@ -97,6 +101,7 @@ def _get_or_create_session():
 
 
 def execute_sql(sql: str, timeout: int = 120) -> list[dict]:
+    logger.info(f"Executing SQL: {sql}")
     """Execute Spark SQL and return results as list of dicts."""
     session_id = _get_or_create_session()
 

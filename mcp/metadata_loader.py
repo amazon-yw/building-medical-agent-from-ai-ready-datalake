@@ -6,19 +6,32 @@ import boto3
 
 logger = logging.getLogger(__name__)
 
+# MCP_MODE: with_metadata (default) | legacy
+MCP_MODE = os.environ.get("MCP_MODE", "with_metadata")
+
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCOUNT_ID = os.environ.get("AWS_ACCOUNT_ID", "")
 METADATA_BUCKET = os.environ.get("METADATA_BUCKET", f"fhir-data-{ACCOUNT_ID}-{REGION}")
 METADATA_KEY = os.environ.get("METADATA_KEY", "metadata/fhir_db_metadata.json")
 
 CATALOG = "s3tablescatalog"
-DB = "data"
+_DB_MAP = {
+    "with_metadata": "data",
+    "legacy": "data_legacy",
+}
+DB = _DB_MAP.get(MCP_MODE, "data")
 
 _metadata = None
 
 
+def _has_metadata() -> bool:
+    return MCP_MODE == "with_metadata"
+
+
 def _load():
     global _metadata
+    if not _has_metadata():
+        return {"domains": {}, "tables": {}}
     if _metadata is not None:
         return _metadata
     try:
@@ -95,6 +108,8 @@ def find_column(table_name: str, *keywords: str) -> str:
 
 def find_patient_ref_column(table_name: str) -> str:
     """Find the column that references the patient table."""
+    if not _has_metadata():
+        return "sbj_ref"
     cols = get_column_map(table_name)
     # Priority 1: references_table == "patient"
     for info in cols.values():

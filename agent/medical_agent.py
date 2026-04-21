@@ -20,9 +20,9 @@ GATEWAY_TOKEN_URL = os.getenv("GATEWAY_TOKEN_URL", "")
 GATEWAY_SCOPE = os.getenv("GATEWAY_SCOPE", "fhir-mcp/tools")
 GATEWAY_TOOL_PREFIX = os.getenv("GATEWAY_TOOL_PREFIX", "FhirMcpLambdaTarget___")
 
-SYSTEM_PROMPT = (Path(__file__).parent / "system_prompt.md").read_text() \
-    if (Path(__file__).parent / "system_prompt.md").exists() \
-    else "You are a helpful medical data assistant."
+_prompt_file = os.getenv("SYSTEM_PROMPT_FILE", "system_prompt.md")
+_prompt_path = Path(__file__).parent / _prompt_file
+SYSTEM_PROMPT = _prompt_path.read_text() if _prompt_path.exists() else "You are a helpful medical data assistant."
 
 app = BedrockAgentCoreApp()
 
@@ -81,7 +81,7 @@ def call_mcp_tool(tool_name: str, arguments: dict) -> dict:
 
 
 # ── Tool Definitions (metadata-driven) ───────────────────────
-TOOL_DEFS = [
+_ALL_TOOL_DEFS = [
     {"name": "list_tables",
      "doc": "List available FHIR data lake tables. Optional domain filter: administrative, clinical, financial, medication, security.",
      "params": {"domain": ""}},
@@ -128,6 +128,10 @@ TOOL_DEFS = [
      "doc": "Fetch a specific PubMed article by PMID with full abstract.",
      "params": {"pmid": None}},
 ]
+
+# Filter tools by ENABLED_TOOLS env var (comma-separated). If not set, use all.
+_enabled = os.getenv("ENABLED_TOOLS", "")
+TOOL_DEFS = [t for t in _ALL_TOOL_DEFS if t["name"] in _enabled.split(",")] if _enabled else _ALL_TOOL_DEFS
 
 _tools = None
 
@@ -215,12 +219,18 @@ def _summarize_tool_result(result_content):
     return str(inner)[:200]
 
 
+# ── Session-based Agent Cache ────────────────────────────────
+_agent_cache = {}
+
 # ── Entrypoint ───────────────────────────────────────────────
 @app.entrypoint
 async def invoke(payload, context):
     from strands import Agent
 
-    agent = Agent(model=MODEL_ID, system_prompt=SYSTEM_PROMPT, tools=_get_tools())
+    session_id = context.session_id if hasattr(context, 'session_id') else payload.get("sessionId", "default")
+    if session_id not in _agent_cache:
+        _agent_cache[session_id] = Agent(model=MODEL_ID, system_prompt=SYSTEM_PROMPT, tools=_get_tools())
+    agent = _agent_cache[session_id]
     prompt = payload.get("prompt", "안녕하세요")
     emitted_tool_ids = set()
 

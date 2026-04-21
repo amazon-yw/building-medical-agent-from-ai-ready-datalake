@@ -24,5 +24,7 @@ cdk/lambda_layers/
 
 # generated temp files
 notebooks/connection_info.json
+notebooks/legacy_connection_info.json
 notebooks/agent_info.json
+notebooks/legacy_agent_info.json
 kiro-chat-log

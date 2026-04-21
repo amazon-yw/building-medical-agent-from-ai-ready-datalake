@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY medical_agent.py system_prompt.md ./
+COPY medical_agent.py system_prompt.md system_prompt_legacy.md ./
 
 EXPOSE 8080
 

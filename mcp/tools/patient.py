@@ -43,7 +43,7 @@ def search_patients(name: str = None, gender: str = None, birth_date_from: str =
 
     conds = []
     if name:
-        conds.append(f"(`{given}` LIKE '%{name}%' OR `{family}` LIKE '%{name}%')")
+        conds.append(f"(CONCAT(`{family}`, `{given}`) LIKE '%{name}%')")
     if gender:
         conds.append(f"`{gen}` = '{mc(pt, 'gender', gender)}'")
     if birth_date_from:

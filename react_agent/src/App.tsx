@@ -9,6 +9,124 @@ import { cn } from './lib/utils';
 import { streamAgentResponse, ChatMessage } from './services/agent';
 import { motion, AnimatePresence } from 'motion/react';
 import { t } from './i18n';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1','#14b8a6'];
+
+const DataChart = React.memo(({ config }: { config: any }) => {
+  const { type, title, labels, datasets } = config;
+
+  if (type === 'pie') {
+    const data = labels.map((l: string, i: number) => ({ name: l, value: datasets[0].data[i] }));
+    return (
+      <div className="my-4">
+        {title && <div className="text-sm font-semibold text-center text-slate-700 mb-2">{title}</div>}
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart><Pie data={data} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+            {data.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+          </Pie><Tooltip /><Legend /></PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  // bar or line
+  const data = labels.map((l: string, i: number) => {
+    const point: any = { name: l };
+    datasets.forEach((ds: any) => { point[ds.label] = ds.data[i]; });
+    return point;
+  });
+  const ChartComp = type === 'line' ? LineChart : BarChart;
+
+  return (
+    <div className="my-4">
+      {title && <div className="text-sm font-semibold text-center text-slate-700 mb-2">{title}</div>}
+      <ResponsiveContainer width="100%" height={300}>
+        <ChartComp data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <Tooltip />
+          <Legend />
+          {datasets.map((ds: any, i: number) =>
+            type === 'line'
+              ? <Line key={ds.label} type="monotone" dataKey={ds.label} stroke={COLORS[i % COLORS.length]} strokeWidth={2} />
+              : <Bar key={ds.label} dataKey={ds.label} fill={COLORS[i % COLORS.length]} />
+          )}
+        </ChartComp>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const mdComponents = {
+  code({ className, children, ...props }: any) {
+    const text = String(children).trim();
+    // Detect JSON chart blocks
+    if (text.startsWith('{"chart"')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.chart) return <DataChart config={parsed.chart} />;
+      } catch {}
+    }
+    // Legacy mermaid support
+    const match = /language-(\w+)/.exec(className || '');
+    if (match && match[1] === 'mermaid') {
+      return <pre className="text-xs bg-slate-100 p-2 rounded">{text}</pre>;
+    }
+    return <code className={className} {...props}>{children}</code>;
+  }
+};
+
+const MessageBubble = React.memo(({ msg, isLast, isLoading, currentTools }: {
+  msg: MessageWithTools; isLast: boolean; isLoading: boolean; currentTools: ToolStep[];
+}) => {
+  const showStreaming = msg.role === 'model' && isLoading && isLast;
+  return (
+    <div className={cn("flex gap-3", msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto")}>
+      <div className={cn(
+        "w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm mt-1",
+        msg.role === 'user' ? "bg-sky-600" : "bg-white border border-slate-200"
+      )}>
+        {msg.role === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-sky-600" />}
+      </div>
+      <div className={cn(
+        "space-y-1 p-3 md:p-4 rounded-2xl shadow-sm text-sm w-full",
+        msg.role === 'user' ? "bg-sky-600 text-white rounded-tr-none" : "bg-white border border-slate-200 rounded-tl-none"
+      )}>
+        {msg.role === 'model' && msg.toolSteps && msg.toolSteps.length > 0 && (
+          <ToolPanel steps={msg.toolSteps} />
+        )}
+        {isLast && isLoading && currentTools.length > 0 && (
+          <ToolPanel steps={currentTools} />
+        )}
+        <div className="markdown-body">
+          {showStreaming ? (
+            <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
+          ) : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+              code({ className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                if (match && match[1] === 'mermaid') {
+                  return <MermaidChart chart={String(children).trim()} />;
+                }
+                return <code className={className} {...props}>{children}</code>;
+              }
+            }}>{msg.text}</ReactMarkdown>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  // Only re-render if this message actually changed
+  if (prev.msg.text !== next.msg.text) return false;
+  if (prev.msg.toolSteps?.length !== next.msg.toolSteps?.length) return false;
+  if (prev.isLast !== next.isLast) return false;
+  if (prev.isLast && prev.isLoading !== next.isLoading) return false;
+  if (prev.isLast && prev.currentTools.length !== next.currentTools.length) return false;
+  return true;
+});
 
 const SCENARIOS = t.scenarioItems;
 
@@ -32,7 +150,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentTools, setCurrentTools] = useState<ToolStep[]>([]);
   const [expandedScenario, setExpandedScenario] = useState<number | null>(null);
-  const [sessionId] = useState(() => {
+  const [sessionId, setSessionId] = useState(() => {
     const hex = () => Math.random().toString(16).slice(2);
     return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`;
   });
@@ -55,6 +173,7 @@ export default function App() {
 
     let buf = '';
     const tools: ToolStep[] = [];
+    let lastToolCount = 0;
 
     const updateLast = (text: string, ts?: ToolStep[]) => {
       setMessages(prev => {
@@ -72,58 +191,67 @@ export default function App() {
         sessionId,
         (chunk) => {
           buf += chunk;
-          updateLast(buf);
+          const newTools = tools.slice(lastToolCount);
+          updateLast(buf, newTools.length > 0 ? newTools : undefined);
         },
         (name: string, toolInput: string) => {
-          // New tool call
-          if (buf.trim()) {
-            updateLast(buf);
+          if (!name && tools.length > 0) {
+            tools[tools.length - 1].input = toolInput;
+          } else if (name) {
+            tools.push({ name, input: toolInput, done: false });
           }
-          buf = '';
-          tools.push({ name, input: toolInput, done: false });
           setCurrentTools([...tools]);
-          setMessages(prev => [...prev, { role: 'model', text: '', toolSteps: [] }]);
+          const newTools = tools.slice(lastToolCount);
+          updateLast(buf, newTools);
         },
         (result, isError) => {
           const last = tools[tools.length - 1];
           if (last) { last.result = result; last.isError = isError; last.done = true; }
+          buf += "\n";
           setCurrentTools([...tools]);
-          updateLast(buf, tools);
+          const newTools = tools.slice(lastToolCount);
+          updateLast(buf, newTools);
         }
       );
     } catch (error: any) {
       buf += `\n\n❌ 오류: ${error.message}`;
     } finally {
-      if (buf.trim()) updateLast(buf, tools);
+      const finalTools = tools.slice(lastToolCount);
+      if (buf.trim() || finalTools.length > 0) updateLast(buf, finalTools.length > 0 ? finalTools : undefined);
       setIsLoading(false);
       setCurrentTools([]);
     }
   };
 
-  const ToolTimeline = ({ steps }: { steps: ToolStep[] }) => (
-    <div className="space-y-1 my-2">
-      {steps.map((step, idx) => (
-        <div
-          key={`${step.name}-${idx}`}
-          className={cn(
-            "px-3 py-1.5 rounded-lg text-xs",
+  const ToolPanel = ({ steps }: { steps: ToolStep[] }) => (
+    <div className="space-y-1.5">
+      {steps.map((step, idx) => {
+        let queryDisplay = '';
+        if (step.input) {
+          try { const p = JSON.parse(step.input); queryDisplay = p.query || step.input; } catch { queryDisplay = step.input; }
+        }
+        return (
+          <div key={`${step.name}-${idx}`} className={cn(
+            "px-3 py-2 rounded-lg text-xs transition-all duration-300",
             step.done
               ? step.isError ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"
-              : "bg-blue-50 border border-blue-200"
-          )}
-        >
-          <div className="flex items-center gap-2">
-            {step.done ? (
-              step.isError ? <X className="w-3.5 h-3.5 text-red-500 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-            ) : (
-              <Wrench className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              : "bg-blue-50 border border-blue-200 animate-pulse"
+          )}>
+            <div className="flex items-center gap-2">
+              {step.done ? (
+                step.isError ? <X className="w-3.5 h-3.5 text-red-500" /> : <Check className="w-3.5 h-3.5 text-green-500" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+              )}
+              <span className="font-semibold text-slate-700">{step.name}</span>
+              {step.done && <span className="text-slate-400 ml-auto text-[10px]">{step.isError ? 'error' : 'done'}</span>}
+            </div>
+            {queryDisplay && (
+              <div className="mt-1.5 px-2 py-1 rounded bg-slate-800 text-green-300 text-[11px] font-mono whitespace-pre-wrap break-all max-h-[10rem] overflow-auto">{queryDisplay}</div>
             )}
-            <span className="font-semibold text-slate-700">{step.name || `${t.step} ${idx + 1}`}</span>
-            {step.result && <span className="text-slate-500 ml-auto text-[10px] flex-shrink-0">{step.result}</span>}
           </div>
-          {step.input && <div className="text-slate-400 text-[10px] font-mono mt-1 break-all overflow-hidden max-h-[3rem]">{step.input}</div>}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -136,8 +264,13 @@ export default function App() {
             <Stethoscope className="text-white w-5 h-5 md:w-6 md:h-6" />
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">🏥 Medical AI Agent</h1>
-            <p className="text-[10px] md:text-xs text-slate-500 font-medium">AI-ready Data Lake · AgentCore · MCP Server</p>
+            <h1 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight">
+              🏥 Medical AI Agent{' '}
+              {(window as any).__APP_MODE__ === 'legacy' && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">Legacy</span>
+              )}
+            </h1>
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium">{t.subtitle}</p>
           </div>
         </div>
       </header>
@@ -183,7 +316,7 @@ export default function App() {
           ))}
           <div className="pt-2">
             <button
-              onClick={() => { setMessages([]); setCurrentTools([]); setExpandedScenario(null); }}
+              onClick={() => { setMessages([]); setCurrentTools([]); setExpandedScenario(null); const hex = () => Math.random().toString(16).slice(2); setSessionId(`${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" /> {t.reset}
@@ -207,10 +340,8 @@ export default function App() {
         )}
 
         {messages.map((msg, idx) => (
-          <motion.div
+          <div
             key={idx}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
             className={cn(
               "flex gap-3",
               msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
@@ -228,27 +359,24 @@ export default function App() {
                 ? "bg-sky-600 text-white rounded-tr-none"
                 : "bg-white border border-slate-200 rounded-tl-none"
             )}>
-              {/* Tool steps for this message */}
               {msg.role === 'model' && msg.toolSteps && msg.toolSteps.length > 0 && (
-                <ToolTimeline steps={msg.toolSteps} />
+                <ToolPanel steps={msg.toolSteps} />
+              )}
+              {msg.role === 'model' && isLoading && idx === messages.length - 1 && currentTools.length > 0 && (
+                <ToolPanel steps={currentTools} />
               )}
               <div className="markdown-body">
                 {msg.role === 'model' && isLoading && idx === messages.length - 1 ? (
                   <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
                 ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.text}</ReactMarkdown>
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         ))}
 
-        {/* Live tool steps while loading */}
-        {isLoading && currentTools.length > 0 && (
-          <div className="mr-auto ml-10 md:ml-11">
-            <ToolTimeline steps={currentTools} />
-          </div>
-        )}
+
 
         {isLoading && currentTools.length === 0 && (
           <div className="flex gap-3 mr-auto">

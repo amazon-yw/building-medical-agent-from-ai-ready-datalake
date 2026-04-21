@@ -4,7 +4,7 @@ from emr_client import execute_sql
 from metadata_loader import CATALOG, DB
 
 BLOCKED_KEYWORDS = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|GRANT|REVOKE)\b",
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|MERGE|GRANT|REVOKE|SHOW|DESCRIBE)\b",
     re.IGNORECASE,
 )
 
@@ -18,6 +18,6 @@ def run_custom_query(query: str) -> list[dict]:
         raise ValueError("Only SELECT queries are allowed.")
     # Auto-correct common wrong table paths
     query = _WRONG_NS.sub(f"`{CATALOG}`.`{DB}`", query)
-    if not re.search(r"\bLIMIT\b", query, re.IGNORECASE):
+    if re.match(r"\s*SELECT\b", query, re.IGNORECASE) and not re.search(r"\bLIMIT\b", query, re.IGNORECASE):
         query = query.rstrip().rstrip(";") + " LIMIT 100"
     return execute_sql(query)

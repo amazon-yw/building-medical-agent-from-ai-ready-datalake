@@ -55,7 +55,7 @@ def handler(event, context):
         arguments = json.loads(arguments)
 
     # Remove meta keys that are not tool arguments
-    for key in ("toolName", "tool_name", "name"):
+    for key in ("toolName", "tool_name"):
         arguments.pop(key, None)
 
     if tool_name not in TOOL_REGISTRY:

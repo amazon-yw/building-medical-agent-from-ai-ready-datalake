@@ -43,20 +43,24 @@ export async function streamAgentResponse(
       if (text === "[DONE]") { onDone?.(); continue; }
       if (text.startsWith("[ERROR]")) { onText(`\n\n❌ ${text}`); continue; }
 
-      // Check for embedded tool markers within the text
-      // Pattern: 🔧 **tool_name** or 🔧 tool_name
+      // Check for embedded tool markers — handle multi-line chunks
       const toolCallMatch = text.match(/🔧\s*\*{0,2}(\w+)\*{0,2}/);
-      const toolInputMatch = text.match(/📥\s*Input:\s*`?({[^`]*})`?/);
-      const toolResultMatch = text.match(/(✅|❌)\s*Result:\s*(.*)/);
+      const toolInputMatch = text.match(/📥\s*Input:\s*`?({[\s\S]*?})`?/);
+      const toolResultMatch = text.match(/(✅|❌)\s*Result:\s*([\s\S]*)/);
 
       if (toolCallMatch) {
         const idx = text.indexOf("🔧");
         const before = text.substring(0, idx).trim();
         if (before) onText(before);
-
         const name = toolCallMatch[1];
         const input = toolInputMatch ? toolInputMatch[1] : "";
         onToolCall?.(name, input);
+        continue;
+      }
+
+      if (toolInputMatch && !toolCallMatch) {
+        // 📥 on a separate line from 🔧 — update last tool's input
+        onToolCall?.("", toolInputMatch[1]);
         continue;
       }
 

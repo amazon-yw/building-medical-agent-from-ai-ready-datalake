@@ -98,5 +98,6 @@ def health():
 
 
 if __name__ == "__main__":
-    print(f"API server on http://0.0.0.0:3001 | REGION={REGION} | AGENT_ARN={'set' if AGENT_ARN else 'missing'}")
-    app.run(host="0.0.0.0", port=3001)
+    port = int(os.getenv("API_PORT", "3001"))
+    print(f"API server on http://0.0.0.0:{port} | REGION={REGION} | AGENT_ARN={'set' if AGENT_ARN else 'missing'}")
+    app.run(host="0.0.0.0", port=port)

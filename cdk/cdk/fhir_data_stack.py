@@ -69,6 +69,13 @@ class FhirDataStack(Stack):
             table_bucket_arn=table_bucket_arn
         )
         s3_namespace.add_dependency(s3_table_bucket)
+
+        s3_namespace_legacy = s3tables.CfnNamespace(
+            self, "FhirNamespaceLegacy",
+            namespace="data_legacy",
+            table_bucket_arn=table_bucket_arn
+        )
+        s3_namespace_legacy.add_dependency(s3_table_bucket)
         
         # 1. S3 Bucket
         bucket = s3.Bucket(
@@ -1020,6 +1027,61 @@ def handler(event, context):
             }
         )
 
+        # EMR Serverless Application (Legacy - for data_legacy namespace)
+        emr_app_legacy = CfnResource(
+            self, "FhirEmrServerlessAppLegacy",
+            type="AWS::EMRServerless::Application",
+            properties={
+                "Name": "fhir-data-query-legacy",
+                "ReleaseLabel": "emr-7.12.0",
+                "Type": "SPARK",
+                "Architecture": "X86_64",
+                "AutoStartConfiguration": {"Enabled": True},
+                "AutoStopConfiguration": {"Enabled": False},
+                "NetworkConfiguration": {
+                    "SubnetIds": [subnet.subnet_id for subnet in vpc.private_subnets],
+                    "SecurityGroupIds": [emr_sg.security_group_id]
+                },
+                "InteractiveConfiguration": {
+                    "LivyEndpointEnabled": True,
+                    "StudioEnabled": True
+                },
+                "InitialCapacity": [
+                    {
+                        "Key": "Driver",
+                        "Value": {
+                            "WorkerCount": 1,
+                            "WorkerConfiguration": {"Cpu": "4 vCPU", "Memory": "16 GB"}
+                        }
+                    },
+                    {
+                        "Key": "Executor",
+                        "Value": {
+                            "WorkerCount": 2,
+                            "WorkerConfiguration": {"Cpu": "4 vCPU", "Memory": "16 GB"}
+                        }
+                    }
+                ],
+                "MaximumCapacity": {
+                    "Cpu": "400 vCPU",
+                    "Memory": "3000 GB",
+                    "Disk": "20000 GB"
+                },
+                "RuntimeConfiguration": [
+                    {
+                        "Classification": "spark-defaults",
+                        "Properties": {
+                            "spark.jars.packages": "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
+                            "spark.sql.catalog.s3tablescatalog": "org.apache.iceberg.spark.SparkCatalog",
+                            "spark.sql.catalog.s3tablescatalog.catalog-impl": "software.amazon.s3tables.iceberg.S3TablesCatalog",
+                            "spark.sql.catalog.s3tablescatalog.warehouse": f"arn:aws:s3tables:{self.region}:{self.account}:bucket/fhir-bucket",
+                            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+                        }
+                    }
+                ],
+            }
+        )
+
         # EMR Studio (required for console management of EMR Serverless)
         emr_studio_engine_sg = ec2.SecurityGroup(
             self, "EmrStudioEngineSG",
@@ -1166,8 +1228,20 @@ def handler(event, context):
         )
         lf_emr_permissions.node.add_dependency(s3_namespace)
 
+        lf_emr_permissions_legacy = CustomResource(self, "LFEmrPermissionsLegacy",
+            service_token=lf_provider.service_token,
+            properties={
+                "RoleArn": lf_grant_role.role_arn,
+                "PrincipalArn": emr_execution_role.role_arn,
+                "CatalogId": s3tables_catalog_id,
+                "DatabaseName": "data_legacy"
+            }
+        )
+        lf_emr_permissions_legacy.node.add_dependency(s3_namespace_legacy)
+
         # Output
         CfnOutput(self, "EmrServerlessAppId", value=emr_app.ref)
+        CfnOutput(self, "EmrServerlessAppLegacyId", value=emr_app_legacy.ref)
         CfnOutput(self, "EmrServerlessExecutionRoleArn", value=emr_execution_role.role_arn)
         CfnOutput(self, "S3TableBucketArn", value=table_bucket_arn)
         CfnOutput(self, "S3TableBucketName", value=s3_table_bucket.table_bucket_name)
