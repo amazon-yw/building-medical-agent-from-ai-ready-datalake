@@ -1570,7 +1570,7 @@ def handler(event, context):
                 "/app-legacy/*": react_behavior,
                 "/api/*": api_behavior,
             },
-            http_version=cloudfront.HttpVersion.HTTP2_AND_3,
+            http_version=cloudfront.HttpVersion.HTTP2,
         )
 
         CfnOutput(self, "CodeEditorURL",
@@ -1654,60 +1654,55 @@ def handler(event, context):
         # ============================================================
         # IAM Identity Center (SSO) + Q Developer Pro
         # ============================================================
-
-        # SSO Instance
-        sso_instance = sso.CfnInstance(self, "SSOInstance")
-
-        # Lambda role for IDC setup
-        idc_lambda_role = iam.Role(self, "IDCLambdaRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-                iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
-            ],
-        )
-        idc_lambda_role.add_to_policy(iam.PolicyStatement(
-            actions=[
-                "sso:DescribeInstance", "sso:ListInstances",
-                "identitystore:CreateGroup", "identitystore:CreateGroupMembership",
-                "identitystore:CreateUser", "identitystore:ListUsers", "identitystore:ListGroups",
-            ],
-            resources=[
-                sso_instance.attr_instance_arn,
-                f"arn:aws:identitystore::{self.account}:identitystore/*",
-                "arn:aws:identitystore:::*",
-            ],
-        ))
-
-        # Lambda to create IDC user, group, Q Developer Pro profile
-        idc_lambda = lambda_.Function(self, "IDCSetupLambda",
-            runtime=lambda_.Runtime.PYTHON_3_10,
-            handler="index.handler",
-            timeout=Duration.minutes(5),
-            role=idc_lambda_role,
-            code=lambda_.Code.from_inline(open(
-                os.path.join(os.path.dirname(__file__), "idc_setup_handler.py")
-            ).read()),
-        )
-
-        # Custom resource to trigger IDC setup
-        idc_setup = CustomResource(self, "IDCSetup",
-            service_token=idc_lambda.function_arn,
-            properties={
-                "InstanceArn": sso_instance.attr_instance_arn,
-                "IdentityStoreId": sso_instance.attr_identity_store_id,
-            },
-        )
-        idc_setup.node.add_dependency(sso_instance)
-
-        # Outputs
-        CfnOutput(self, "IDCUsername", value="qdev")
-        CfnOutput(self, "IDCUserEmail", value="qdev@example.com")
-        CfnOutput(self, "IDCStartURL",
-            value=idc_setup.get_att_string("StartURL"))
-        CfnOutput(self, "IDCPassword",
-            value=idc_setup.get_att_string("PasswordOTP"))
-        CfnOutput(self, "IDCRegion", value="us-east-1")
+        #         # SSO Instance
+        # sso_instance = sso.CfnInstance(self, "SSOInstance")
+        #         # Lambda role for IDC setup
+        # idc_lambda_role = iam.Role(self, "IDCLambdaRole",
+        # assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+        # managed_policies=[
+        # iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
+        # iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"),
+        # ],
+        # )
+        # idc_lambda_role.add_to_policy(iam.PolicyStatement(
+        # actions=[
+        # "sso:DescribeInstance", "sso:ListInstances",
+        # "identitystore:CreateGroup", "identitystore:CreateGroupMembership",
+        # "identitystore:CreateUser", "identitystore:ListUsers", "identitystore:ListGroups",
+        # ],
+        # resources=[
+        # sso_instance.attr_instance_arn,
+        # f"arn:aws:identitystore::{self.account}:identitystore/*",
+        # "arn:aws:identitystore:::*",
+        # ],
+        # ))
+        #         # Lambda to create IDC user, group, Q Developer Pro profile
+        # idc_lambda = lambda_.Function(self, "IDCSetupLambda",
+        # runtime=lambda_.Runtime.PYTHON_3_10,
+        # handler="index.handler",
+        # timeout=Duration.minutes(5),
+        # role=idc_lambda_role,
+        # code=lambda_.Code.from_inline(open(
+        # os.path.join(os.path.dirname(__file__), "idc_setup_handler.py")
+        # ).read()),
+        # )
+        #         # Custom resource to trigger IDC setup
+        # idc_setup = CustomResource(self, "IDCSetup",
+        # service_token=idc_lambda.function_arn,
+        # properties={
+        # "InstanceArn": sso_instance.attr_instance_arn,
+        # "IdentityStoreId": sso_instance.attr_identity_store_id,
+        # },
+        # )
+        # idc_setup.node.add_dependency(sso_instance)
+        #         # Outputs
+        # CfnOutput(self, "IDCUsername", value="qdev")
+        # CfnOutput(self, "IDCUserEmail", value="qdev@example.com")
+        # CfnOutput(self, "IDCStartURL",
+        # value=idc_setup.get_att_string("StartURL"))
+        # CfnOutput(self, "IDCPassword",
+        # value=idc_setup.get_att_string("PasswordOTP"))
+        # CfnOutput(self, "IDCRegion", value="us-east-1")
 
         # ============================================================
         # Bedrock Model Access Activation
