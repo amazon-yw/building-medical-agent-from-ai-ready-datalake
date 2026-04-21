@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=participant
-WorkingDirectory=/workshop/react_agent
-EnvironmentFile=/workshop/react_agent/.env
-ExecStart=/usr/bin/python3 -m gunicorn \
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/.env
+ExecStart=__GUNICORN__ \
     --bind 127.0.0.1:3001 \
     --workers 2 \
     --worker-class gthread \

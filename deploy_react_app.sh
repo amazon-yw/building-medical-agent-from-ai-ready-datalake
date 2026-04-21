@@ -86,7 +86,11 @@ sudo systemctl reload nginx
 
 # ── 5. Install & start systemd service ───────────────────────────────────────
 echo ">>> Installing systemd service..."
-sudo cp "$APP_DIR/medical-agent-api.service" /etc/systemd/system/
+GUNICORN_BIN=$(which gunicorn 2>/dev/null || echo "/home/participant/.local/bin/gunicorn")
+sed -e "s|__APP_DIR__|${APP_DIR}|g" \
+    -e "s|__GUNICORN__|${GUNICORN_BIN}|g" \
+    "$APP_DIR/medical-agent-api.service" \
+    | sudo tee /etc/systemd/system/medical-agent-api.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable medical-agent-api
 sudo systemctl restart medical-agent-api
