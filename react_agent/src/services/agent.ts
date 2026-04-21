@@ -16,7 +16,7 @@ export async function streamAgentResponse(
 ): Promise<void> {
   const endpoint = __APP_MODE__ === 'legacy' ? '/api/legacy/chat' : '/api/chat';
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if (accessToken) headers["X-Auth-Token"] = accessToken;
 
   const resp = await fetch(endpoint, {
     method: "POST",

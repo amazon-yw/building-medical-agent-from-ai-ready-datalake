@@ -1540,10 +1540,10 @@ def handler(event, context):
             cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
             origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
         )
-        # API behavior: must forward Authorization header
+        # API behavior: forward custom auth header (Authorization blocked by CloudFront)
         api_origin_request_policy = cloudfront.OriginRequestPolicy(self, "ApiOriginRequestPolicy",
             header_behavior=cloudfront.OriginRequestHeaderBehavior.allow_list(
-                "Authorization", "Content-Type", "Accept", "Origin",
+                "Content-Type", "X-Auth-Token", "Origin",
                 "Access-Control-Request-Headers", "Access-Control-Request-Method",
             ),
             query_string_behavior=cloudfront.OriginRequestQueryStringBehavior.all(),

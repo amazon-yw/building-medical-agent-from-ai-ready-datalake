@@ -55,10 +55,10 @@ def _require_auth() -> "Response | None":
     """Return 401 response if token invalid, else None."""
     if not USER_POOL_ID:
         return None  # dev mode
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
+    token = request.headers.get("X-Auth-Token") or \
+            request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
         return Response(json.dumps({"error": "Unauthorized"}), status=401, mimetype="application/json")
-    token = auth[7:]
     if not _verify_token(token):
         return Response(json.dumps({"error": "Invalid token"}), status=401, mimetype="application/json")
     return None
