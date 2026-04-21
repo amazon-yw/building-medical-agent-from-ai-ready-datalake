@@ -82,6 +82,17 @@ echo ">>> Installing nginx config..."
 sed "s|/workshop/react_agent|${APP_DIR}|g" \
     "$APP_DIR/nginx-medical-agent.conf" \
     | sudo tee /etc/nginx/conf.d/medical-agent.conf > /dev/null
+
+# Disable default server block in nginx.conf (conflicts with medical-agent.conf)
+if grep -q "^    server {" /etc/nginx/nginx.conf 2>/dev/null; then
+  sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+  sudo bash -c "awk '
+/^    server \{/{found=1; print \"    #\" substr(\$0,5); next}
+found && /^    \}/{print \"    #}\"; found=0; next}
+found{print \"    #\" substr(\$0,5); next}
+{print}
+' /etc/nginx/nginx.conf.bak > /etc/nginx/nginx.conf"
+fi
 sudo rm -f /etc/nginx/conf.d/code-editor.conf 2>/dev/null || true
 sudo nginx -t
 sudo systemctl reload nginx
