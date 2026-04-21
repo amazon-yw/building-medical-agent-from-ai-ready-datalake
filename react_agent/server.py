@@ -181,7 +181,8 @@ def _stream_response(arn: str, prompt: str, session_id: str):
             except queue.Empty:
                 yield ": keepalive\n\n"  # SSE comment — keeps connection alive
 
-    return Response(generate(), content_type="text/event-stream")
+    return Response(generate(), content_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/health")
