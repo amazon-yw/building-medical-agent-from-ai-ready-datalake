@@ -61,7 +61,7 @@ cat "$APP_DIR/.env"
 
 # ── 2. Install Python deps ────────────────────────────────────────────────────
 echo ">>> Installing Python dependencies..."
-pip3 install -q flask flask-cors boto3 gunicorn gevent PyJWT cryptography
+pip3 install -q flask flask-cors boto3 gunicorn PyJWT cryptography
 
 # ── 3. Install Node deps & build ─────────────────────────────────────────────
 echo ">>> Building React app (main)..."
