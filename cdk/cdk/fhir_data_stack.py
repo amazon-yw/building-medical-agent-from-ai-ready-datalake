@@ -1540,6 +1540,22 @@ def handler(event, context):
             cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
             origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER,
         )
+        # API behavior: must forward Authorization header
+        api_origin_request_policy = cloudfront.OriginRequestPolicy(self, "ApiOriginRequestPolicy",
+            header_behavior=cloudfront.OriginRequestHeaderBehavior.allow_list(
+                "Authorization", "Content-Type", "Accept", "Origin",
+                "Access-Control-Request-Headers", "Access-Control-Request-Method",
+            ),
+            query_string_behavior=cloudfront.OriginRequestQueryStringBehavior.all(),
+            cookie_behavior=cloudfront.OriginRequestCookieBehavior.none(),
+        )
+        api_behavior = cloudfront.BehaviorOptions(
+            origin=ec2_origin,
+            allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+            viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+            origin_request_policy=api_origin_request_policy,
+        )
         cf_distribution = cloudfront.Distribution(self, "CodeEditorCF",
             default_behavior=cloudfront.BehaviorOptions(
                 origin=ec2_origin,
@@ -1551,7 +1567,7 @@ def handler(event, context):
             additional_behaviors={
                 "/app/*": react_behavior,
                 "/app-legacy/*": react_behavior,
-                "/api/*": react_behavior,
+                "/api/*": api_behavior,
             },
             http_version=cloudfront.HttpVersion.HTTP2_AND_3,
         )
