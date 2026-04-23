@@ -152,6 +152,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentTools, setCurrentTools] = useState<ToolStep[]>([]);
   const [expandedScenario, setExpandedScenario] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [sessionId, setSessionId] = useState(() => {
     const hex = () => Math.random().toString(16).slice(2);
     return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`;
@@ -206,6 +208,8 @@ export default function App() {
     setInput('');
     setIsLoading(true);
     setCurrentTools([]);
+    setElapsedTime(0);
+    timerRef.current = setInterval(() => setElapsedTime(t => t + 1), 1000);
 
     let buf = '';
     const tools: ToolStep[] = [];
@@ -255,6 +259,7 @@ export default function App() {
     } catch (error: any) {
       buf += `\n\n❌ 오류: ${error.message}`;
     } finally {
+      if (timerRef.current) clearInterval(timerRef.current);
       const finalTools = tools.slice(lastToolCount);
       if (buf.trim() || finalTools.length > 0) updateLast(buf, finalTools.length > 0 ? finalTools : undefined);
       setIsLoading(false);
@@ -366,7 +371,7 @@ export default function App() {
           ))}
           <div className="pt-2">
             <button
-              onClick={() => { setMessages([]); setCurrentTools([]); setExpandedScenario(null); const hex = () => Math.random().toString(16).slice(2); setSessionId(`${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`); }}
+              onClick={() => { setMessages([]); setCurrentTools([]); setIsLoading(false); setElapsedTime(0); if (timerRef.current) clearInterval(timerRef.current); setExpandedScenario(null); const hex = () => Math.random().toString(16).slice(2); setSessionId(`${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}-aaaaaaaaaa`); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" /> {t.reset}
@@ -417,9 +422,15 @@ export default function App() {
               )}
               <div className="markdown-body">
                 {msg.role === 'model' && isLoading && idx === messages.length - 1 ? (
-                  <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
-                ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.text}</ReactMarkdown>
+                  <>
+                    <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}<span className="animate-pulse">▌</span></pre>
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>{t.analyzing}</span>
+                      <span className="font-mono">{elapsedTime}s</span>
+                    </div>
+                  </>
+                ) : (                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.text}</ReactMarkdown>
                 )}
               </div>
             </div>
