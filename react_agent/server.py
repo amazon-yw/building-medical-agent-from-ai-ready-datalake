@@ -11,6 +11,7 @@ AGENT_ARN = os.getenv("AGENT_ARN", "")
 LEGACY_AGENT_ARN = os.getenv("LEGACY_AGENT_ARN", "")
 USER_POOL_ID = os.getenv("VITE_COGNITO_USER_POOL_ID", "")
 ALLOWED_ORIGIN = os.getenv("VITE_COGNITO_REDIRECT_URI", "")
+AUTH_DISABLED = os.getenv("AUTH_DISABLED", "").lower() in ("true", "1", "yes")
 
 # CORS: restrict to CloudFront origin in production
 CORS(app, origins=[ALLOWED_ORIGIN] if ALLOWED_ORIGIN else "*", supports_credentials=True)
@@ -53,7 +54,7 @@ def _verify_token(token: str) -> bool:
 
 def _require_auth() -> "Response | None":
     """Return 401 response if token invalid, else None."""
-    if not USER_POOL_ID:
+    if AUTH_DISABLED or not USER_POOL_ID:
         return None  # dev mode
     token = request.headers.get("X-Auth-Token") or \
             request.headers.get("Authorization", "").replace("Bearer ", "")

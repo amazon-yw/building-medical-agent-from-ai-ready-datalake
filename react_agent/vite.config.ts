@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
+      __AUTH_DISABLED__: JSON.stringify(env.VITE_AUTH_DISABLED === 'true'),
       __APP_MODE__: JSON.stringify(env.VITE_APP_MODE || 'with_metadata'),
       __COGNITO_CONFIG__: JSON.stringify({
         userPoolId: env.VITE_COGNITO_USER_POOL_ID || '',

@@ -146,7 +146,7 @@ interface MessageWithTools {
 }
 
 export default function App() {
-  const { tokens, email, loading, signIn, signOut, getAccessToken } = useAuth();
+  const { tokens, email, loading, signIn, signOut, getAccessToken, authDisabled } = useAuth();
   const [messages, setMessages] = useState<MessageWithTools[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -318,15 +318,17 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500 hidden md:block">{email}</span>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
-            title="로그아웃"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden md:block">로그아웃</span>
-          </button>
+          {!authDisabled && <span className="text-xs text-slate-500 hidden md:block">{email}</span>}
+          {!authDisabled && (
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+              title="로그아웃"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:block">로그아웃</span>
+            </button>
+          )}
         </div>
       </header>
 
