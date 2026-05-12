@@ -23,6 +23,15 @@ const ko = {
       ]
     },
     {
+      icon: "🧬", label: "의학 온톨로지 (SNOMED·ICD-10)",
+      questions: [
+        "당뇨병과 그 합병증·동반질환의 관계망을 그래프로 시각화해줘.",
+        "당뇨병 환자를 SNOMED 코드별로 트리로 시각화해줘.",
+        "만성 콩팥병(Chronic kidney disease)의 상위·하위 분류와 환자 수를 보여줘.",
+        "허혈성 심장질환의 합병증·동반질환 환자 분포를 그래프로 보여줘.",
+      ]
+    },
+    {
       icon: "🏥", label: "입원 회진",
       questions: [
         "최근 입원했던 환자 목록 좀 보여줘.",
@@ -84,6 +93,15 @@ const en: typeof ko = {
       ]
     },
     {
+      icon: "🧬", label: "Medical Ontology (SNOMED·ICD-10)",
+      questions: [
+        "Visualise diabetes together with its complications and comorbidities as a relationship graph.",
+        "Visualise diabetes patients broken down by SNOMED codes as a tree.",
+        "Show the hierarchy of chronic kidney disease with patient counts.",
+        "Show ischemic heart disease complications and comorbidities as a graph.",
+      ]
+    },
+    {
       icon: "🏥", label: "Inpatient Rounds",
       questions: [
         "Show me recently admitted patients.",
@@ -126,13 +144,48 @@ const en: typeof ko = {
 const locales = { ko, en } as const;
 type Locale = keyof typeof locales;
 
+const STORAGE_KEY = "app.locale";
+
 function detectLocale(): Locale {
   const param = new URLSearchParams(window.location.search).get("lang");
   if (param && param in locales) return param as Locale;
+  const stored = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  if (stored && stored in locales) return stored as Locale;
   const nav = navigator.language.split("-")[0];
   return nav === "ko" ? "ko" : "en";
 }
 
-export const locale = detectLocale();
-export const t = locales[locale];
+let currentLocale: Locale = detectLocale();
+const subscribers = new Set<(loc: Locale) => void>();
+
+export function getLocale(): Locale {
+  return currentLocale;
+}
+
+export function setLocale(next: Locale): void {
+  if (!(next in locales) || next === currentLocale) return;
+  currentLocale = next;
+  try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+  subscribers.forEach((fn) => {
+    try { fn(next); } catch {}
+  });
+}
+
+export function subscribeLocale(fn: (loc: Locale) => void): () => void {
+  subscribers.add(fn);
+  return () => { subscribers.delete(fn); };
+}
+
+/** Read translations for the currently-selected locale.
+ *  Components that need to re-render on locale change should use the
+ *  `useLocale` hook in App.tsx instead of capturing this at module load. */
+export function getT(): typeof ko {
+  return locales[currentLocale] as typeof ko;
+}
+
+// Backwards-compatible exports — these are snapshots at initial load and do
+// NOT update when the user toggles the language. New code should use getT()
+// / useLocale() instead.
+export const locale = currentLocale;
+export const t = locales[currentLocale] as typeof ko;
 export type { Locale };

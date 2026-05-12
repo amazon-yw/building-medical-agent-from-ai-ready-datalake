@@ -1,0 +1,323 @@
+# Medical disease ontology for the FHIR (Synthea) data lake.
+#
+# The clinical source is the FHIR ``condition`` table, whose codes are SNOMED CT
+# (``code_value`` holds the concept_id, ``code_display`` holds the English label).
+# For lookup by ICD-10 range we also keep the WHO ICD-10 chapter/block skeleton
+# so that tools can answer "show me all circulatory disorders" questions in the
+# same way they do on the CAUH dataset.
+#
+# Structure:
+#   chapters[]          — WHO ICD-10 chapter/block skeleton (shared).
+#   disease_relations[] — anchor conditions curated for the FHIR dataset.
+#     Each anchor declares
+#       match_patterns     : regex fragments run against LOWER(code_display)
+#       snomed_codes       : SNOMED concept_ids that belong to this anchor
+#       complications / comorbidities : related condition groups; each entry
+#         has an optional snomed list and a label describing the group.
+#
+# Anchors were selected based on patient counts observed in the Synthea data
+# (top 10 disease-centric conditions, excluding social/behavioural findings).
+
+chapters:
+  - id: "I"
+    range: "A00-B99"
+    label_ko: "특정 감염성 및 기생충성 질환"
+    label_en: "Certain infectious and parasitic diseases"
+    blocks:
+      - {range: "A00-A09", label_en: "Intestinal infectious diseases"}
+      - {range: "A15-A19", label_en: "Tuberculosis"}
+      - {range: "B15-B19", label_en: "Viral hepatitis"}
+      - {range: "B20-B24", label_en: "HIV disease"}
+  - id: "II"
+    range: "C00-D48"
+    label_ko: "신생물"
+    label_en: "Neoplasms"
+    blocks:
+      - {range: "C15-C26", label_en: "Malignant neoplasms of digestive organs"}
+      - {range: "C30-C39", label_en: "Malignant neoplasms of respiratory & intrathoracic organs"}
+      - {range: "C43-C44", label_en: "Melanoma & other skin malignancies"}
+      - {range: "C50-C50", label_en: "Malignant neoplasm of breast"}
+      - {range: "C60-C63", label_en: "Malignant neoplasms of male genital organs"}
+      - {range: "C81-C96", label_en: "Malignant neoplasms of lymphoid & hematopoietic tissue"}
+  - id: "III"
+    range: "D50-D89"
+    label_ko: "혈액 및 조혈기관의 질환"
+    label_en: "Diseases of the blood and blood-forming organs"
+    blocks:
+      - {range: "D50-D53", label_en: "Nutritional anaemias"}
+      - {range: "D60-D64", label_en: "Aplastic and other anaemias"}
+  - id: "IV"
+    range: "E00-E90"
+    label_ko: "내분비, 영양 및 대사 질환"
+    label_en: "Endocrine, nutritional and metabolic diseases"
+    blocks:
+      - {range: "E10-E14", label_en: "Diabetes mellitus"}
+      - {range: "E65-E68", label_en: "Obesity and other hyperalimentation"}
+      - {range: "E70-E90", label_en: "Metabolic disorders"}
+  - id: "V"
+    range: "F00-F99"
+    label_ko: "정신 및 행동 장애"
+    label_en: "Mental and behavioural disorders"
+    blocks:
+      - {range: "F00-F09", label_en: "Organic mental disorders (incl. dementia)"}
+      - {range: "F30-F39", label_en: "Mood (affective) disorders"}
+      - {range: "F40-F48", label_en: "Neurotic, stress-related and somatoform disorders"}
+  - id: "VI"
+    range: "G00-G99"
+    label_ko: "신경계통의 질환"
+    label_en: "Diseases of the nervous system"
+    blocks:
+      - {range: "G30-G32", label_en: "Other degenerative diseases of the nervous system"}
+      - {range: "G40-G47", label_en: "Episodic and paroxysmal disorders"}
+      - {range: "G60-G64", label_en: "Polyneuropathies"}
+  - id: "IX"
+    range: "I00-I99"
+    label_ko: "순환계통의 질환"
+    label_en: "Diseases of the circulatory system"
+    blocks:
+      - {range: "I10-I15", label_en: "Hypertensive diseases"}
+      - {range: "I20-I25", label_en: "Ischaemic heart diseases"}
+      - {range: "I30-I52", label_en: "Other forms of heart disease"}
+      - {range: "I60-I69", label_en: "Cerebrovascular diseases"}
+  - id: "X"
+    range: "J00-J99"
+    label_ko: "호흡계통의 질환"
+    label_en: "Diseases of the respiratory system"
+    blocks:
+      - {range: "J00-J06", label_en: "Acute upper respiratory infections"}
+      - {range: "J09-J18", label_en: "Influenza and pneumonia"}
+      - {range: "J30-J39", label_en: "Other diseases of upper respiratory tract"}
+      - {range: "J40-J47", label_en: "Chronic lower respiratory diseases"}
+  - id: "XI"
+    range: "K00-K93"
+    label_ko: "소화계통의 질환"
+    label_en: "Diseases of the digestive system"
+    blocks:
+      - {range: "K00-K14", label_en: "Diseases of oral cavity, salivary glands & jaws"}
+      - {range: "K20-K31", label_en: "Diseases of oesophagus, stomach & duodenum"}
+  - id: "XIII"
+    range: "M00-M99"
+    label_ko: "근골격계통 및 결합조직의 질환"
+    label_en: "Diseases of the musculoskeletal system and connective tissue"
+    blocks:
+      - {range: "M00-M25", label_en: "Arthropathies"}
+      - {range: "M40-M54", label_en: "Dorsopathies"}
+  - id: "XIV"
+    range: "N00-N99"
+    label_ko: "비뇨생식계통의 질환"
+    label_en: "Diseases of the genitourinary system"
+    blocks:
+      - {range: "N17-N19", label_en: "Renal failure"}
+      - {range: "N40-N51", label_en: "Diseases of male genital organs"}
+
+
+# ──────────────────────────────────────────────────────────────
+# Anchor conditions curated for the FHIR / Synthea dataset.
+# ──────────────────────────────────────────────────────────────
+disease_relations:
+
+  - anchor: "diabetes"
+    label: "Diabetes mellitus"
+    label_ko: "당뇨병"
+    icd10: "E10-E14"
+    match_patterns: ["diabet", "hyperglycem", "prediabet"]
+    snomed_codes:
+      ["44054006", "73211009", "46635009", "237599002",
+       "714628002", "80394007"]
+    complications:
+      - label: "Diabetic retinopathy"
+        label_ko: "당뇨병성 망막병증"
+        patterns: ["retinopathy.*diabet", "diabet.*retin"]
+        snomed: ["1551000119108", "193349004", "422034002"]
+      - label: "Diabetic nephropathy"
+        label_ko: "당뇨병성 신장병증"
+        patterns: ["kidney.*diabet", "diabet.*nephro", "microalbumin.*diabet",
+                   "proteinuria.*diabet"]
+        snomed: ["127013003", "90781000119102", "157141000119108", "420715001"]
+      - label: "Diabetic neuropathy"
+        label_ko: "당뇨병성 신경병증"
+        patterns: ["neuropathy.*diabet", "diabet.*neurop"]
+        snomed: ["368581000119106", "230572002"]
+      - label: "Hyperglycemia"
+        label_ko: "고혈당"
+        patterns: ["hyperglycem"]
+        snomed: ["80394007"]
+    comorbidities:
+      - label: "Hypertension"
+        label_ko: "고혈압"
+        patterns: ["hypertens"]
+        snomed: ["59621000"]
+      - label: "Obesity"
+        label_ko: "비만"
+        patterns: ["obesity", "body mass index 30"]
+        snomed: ["162864005"]
+
+  - anchor: "hypertension"
+    label: "Hypertensive disease"
+    label_ko: "고혈압성 질환"
+    icd10: "I10-I15"
+    match_patterns: ["hypertens"]
+    snomed_codes: ["59621000", "38341003"]
+    complications:
+      - label: "Ischemic heart disease"
+        label_ko: "허혈성 심장질환"
+        patterns: ["ischemic heart|coronary|angina|myocardial infarction"]
+        snomed: ["414545008", "22298006", "194828000"]
+      - label: "Cerebrovascular accident"
+        label_ko: "뇌혈관 사고"
+        patterns: ["stroke|cerebrovascular"]
+        snomed: ["230690007"]
+      - label: "Chronic kidney disease"
+        label_ko: "만성 콩팥병"
+        patterns: ["chronic kidney disease|ckd"]
+        snomed: ["431855005", "431856006", "433144002", "431857002", "46177005"]
+    comorbidities:
+      - label: "Diabetes mellitus"
+        label_ko: "당뇨병"
+        patterns: ["diabet"]
+        snomed: ["44054006", "714628002"]
+
+  - anchor: "chronic_kidney_disease"
+    label: "Chronic kidney disease"
+    label_ko: "만성 콩팥병"
+    icd10: "N17-N19"
+    match_patterns: ["chronic kidney disease|ckd|end-stage renal|renal failure"]
+    snomed_codes:
+      ["431855005", "431856006", "433144002", "431857002", "46177005",
+       "90688005"]
+    complications:
+      - label: "Anemia"
+        label_ko: "빈혈"
+        patterns: ["anemia|anaemia"]
+        snomed: ["271737000"]
+      - label: "End-stage renal disease"
+        label_ko: "말기신부전"
+        patterns: ["end-stage renal|esrd"]
+        snomed: ["46177005"]
+    comorbidities:
+      - label: "Diabetes mellitus"
+        label_ko: "당뇨병"
+        patterns: ["diabet"]
+        snomed: ["44054006"]
+      - label: "Hypertension"
+        label_ko: "고혈압"
+        patterns: ["hypertens"]
+        snomed: ["59621000"]
+
+  - anchor: "ischemic_heart_disease"
+    label: "Ischemic heart disease (CAD / MI / angina)"
+    label_ko: "허혈성 심장질환"
+    icd10: "I20-I25"
+    match_patterns:
+      ["ischemic heart|coronary artery|angina|myocardial infarction"]
+    snomed_codes: ["414545008", "22298006", "194828000",
+                   "401314000", "401303003", "399211009"]
+    complications:
+      - label: "Heart failure"
+        label_ko: "심부전"
+        patterns: ["heart failure|cardiac failure"]
+        snomed: ["84114007"]
+      - label: "Cardiac arrhythmia"
+        label_ko: "심장부정맥"
+        patterns: ["arrhythmia|fibrillation|flutter"]
+        snomed: ["49436004"]
+    comorbidities:
+      - label: "Hypertension"
+        label_ko: "고혈압"
+        patterns: ["hypertens"]
+        snomed: ["59621000"]
+      - label: "Diabetes mellitus"
+        label_ko: "당뇨병"
+        patterns: ["diabet"]
+        snomed: ["44054006"]
+
+  - anchor: "malignant_neoplasm"
+    label: "Malignant neoplasm (cancer)"
+    label_ko: "악성 신생물 (암)"
+    icd10: "C00-C97"
+    match_patterns:
+      ["malignant|cancer|carcinoma|non-small cell|small cell lung|neoplasm.*mal"]
+    snomed_codes: ["254837009", "126906006", "92691004", "109838007",
+                   "254637007", "424132000"]
+    complications:
+      - label: "Anemia of chronic disease"
+        label_ko: "만성질환성 빈혈"
+        patterns: ["anemia"]
+        snomed: ["271737000"]
+    comorbidities: []
+
+  - anchor: "respiratory_chronic"
+    label: "Chronic lower respiratory disease (asthma / COPD)"
+    label_ko: "만성 하기도 질환 (천식·COPD)"
+    icd10: "J40-J47"
+    match_patterns: ["asthma|copd|emphysema|chronic obstructive"]
+    snomed_codes: ["233678006", "195967001", "87433001"]
+    complications:
+      - label: "Pneumonia"
+        label_ko: "폐렴"
+        patterns: ["pneumonia"]
+        snomed: ["233604007"]
+    comorbidities:
+      - label: "Hypertension"
+        label_ko: "고혈압"
+        patterns: ["hypertens"]
+        snomed: ["59621000"]
+
+  - anchor: "anemia"
+    label: "Anemia"
+    label_ko: "빈혈"
+    icd10: "D50-D64"
+    match_patterns: ["anemia|anaemia"]
+    snomed_codes: ["271737000"]
+    complications: []
+    comorbidities:
+      - label: "Chronic kidney disease"
+        label_ko: "만성 콩팥병"
+        patterns: ["chronic kidney disease"]
+        snomed: ["431855005"]
+
+  - anchor: "dementia"
+    label: "Dementia (Alzheimer's disease)"
+    label_ko: "치매 (알츠하이머병)"
+    icd10: "F00-F03"
+    match_patterns: ["alzheimer|dementia"]
+    snomed_codes: ["26929004", "230265002"]
+    complications: []
+    comorbidities:
+      - label: "Hypertension"
+        label_ko: "고혈압"
+        patterns: ["hypertens"]
+        snomed: ["59621000"]
+      - label: "Diabetes mellitus"
+        label_ko: "당뇨병"
+        patterns: ["diabet"]
+        snomed: ["44054006"]
+
+  - anchor: "osteoarthritis"
+    label: "Osteoarthritis"
+    label_ko: "골관절염"
+    icd10: "M15-M19"
+    match_patterns: ["osteoarthritis|osteoarth"]
+    snomed_codes: ["239873007", "239872002", "201834006"]
+    complications:
+      - label: "Back pain"
+        label_ko: "요통"
+        patterns: ["back pain|low back"]
+    comorbidities:
+      - label: "Obesity"
+        label_ko: "비만"
+        patterns: ["obesity|body mass index 30"]
+        snomed: ["162864005"]
+
+  - anchor: "anxiety_depression"
+    label: "Anxiety and depressive disorders"
+    label_ko: "불안·우울 장애"
+    icd10: "F30-F48"
+    match_patterns: ["anxiety|depress|panic"]
+    snomed_codes: ["80583007", "370143000", "48694002"]
+    complications: []
+    comorbidities:
+      - label: "Chronic pain"
+        label_ko: "만성 통증"
+        patterns: ["chronic pain"]
+        snomed: ["82423001"]

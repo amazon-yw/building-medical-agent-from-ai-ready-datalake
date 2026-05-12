@@ -9,8 +9,17 @@ import remarkGfm from 'remark-gfm';
 import { cn } from './lib/utils';
 import { streamAgentResponse, ChatMessage } from './services/agent';
 import { motion, AnimatePresence } from 'motion/react';
-import { t } from './i18n';
+import { getT, setLocale, getLocale, subscribeLocale, type Locale } from './i18n';
+
+// Hook that re-renders the component tree whenever the user toggles the
+// active locale.
+function useLocale(): [ReturnType<typeof getT>, Locale, (l: Locale) => void] {
+  const [loc, setLoc] = useState<Locale>(() => getLocale());
+  useEffect(() => subscribeLocale(setLoc), []);
+  return [getT(), loc, setLocale];
+}
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ForceGraph2D from 'react-force-graph-2d';
 
 const COLORS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316','#6366f1','#14b8a6'];
 
@@ -60,23 +69,260 @@ const DataChart = React.memo(({ config }: { config: any }) => {
   );
 });
 
+// ───────────────────────────────────────────────────────────────
+// DiseaseTree: ICD-10 / SNOMED hierarchy visualisation produced by
+// medical_ontology MCP tools (expand_disease_term / get_disease_hierarchy).
+// ───────────────────────────────────────────────────────────────
+const RELATION_COLOR: Record<string, string> = {
+  primary:          'bg-blue-100 text-blue-800 border-blue-300',
+  complication:     'bg-rose-100 text-rose-800 border-rose-300',
+  comorbidity:      'bg-amber-100 text-amber-800 border-amber-300',
+  context_specific: 'bg-purple-100 text-purple-800 border-purple-300',
+  history:          'bg-slate-100 text-slate-600 border-slate-300',
+  symptom:          'bg-emerald-100 text-emerald-800 border-emerald-300',
+};
+const DiseaseTree = React.memo(({ config }: { config: any }) => {
+  const { title, chapter, block, nodes = [], children = [] } = config || {};
+  const maxPatients = Math.max(1, ...nodes.map((n: any) => Number(n.patients) || 0));
+  return (
+    <div className="my-4 border border-slate-200 rounded-lg p-3 bg-white">
+      {title && <div className="text-sm font-semibold text-slate-800 mb-2">🧬 {title}</div>}
+      {chapter && (
+        <div className="text-xs text-slate-500 mb-1">
+          <span className="inline-block min-w-[60px] font-mono">{chapter.range}</span>
+          {chapter.label || chapter.label_en || chapter.label_ko}
+        </div>
+      )}
+      {block && (
+        <div className="text-xs text-slate-600 mb-2 pl-4">
+          <span className="inline-block min-w-[60px] font-mono">{block.range}</span>
+          {block.label || block.label_en || block.label_ko}
+        </div>
+      )}
+      {nodes.length > 0 && (
+        <div className="space-y-1.5 mt-2">
+          {nodes.map((n: any, idx: number) => {
+            const pts = Number(n.patients) || 0;
+            const pct = Math.min(100, Math.round((pts / maxPatients) * 100));
+            const rel = (n.relation || 'primary') as string;
+            const relCls = RELATION_COLOR[rel] || RELATION_COLOR.primary;
+            return (
+              <div key={n.code || idx} className="flex items-center gap-2 text-xs">
+                <span className="font-mono font-semibold w-20 shrink-0 truncate" title={n.code}>{n.code}</span>
+                <span className="truncate text-slate-700 w-40 shrink-0" title={n.label}>{n.label || ''}</span>
+                <span className={cn('border rounded px-1.5 py-0.5 text-[10px] font-medium', relCls)}>{rel}</span>
+                <div className="flex-1 bg-slate-100 rounded h-4 relative overflow-hidden">
+                  {pts > 0 && <div className="h-full bg-blue-400" style={{ width: `${pct}%` }} />}
+                </div>
+                <span className="font-mono text-slate-600 w-14 text-right tabular-nums">{pts.toLocaleString()}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {children.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
+          <div className="text-[11px] text-slate-500 mb-1">Sub-codes ({children.length})</div>
+          <div className="grid grid-cols-2 gap-1 text-[11px]">
+            {children.slice(0, 10).map((c: any, i: number) => (
+              <div key={c.code || i} className="truncate" title={`${c.code} ${c.label || ''}`}>
+                <span className="font-mono text-slate-500">{c.code}</span>
+                <span className="text-slate-700 ml-1">{c.label}</span>
+              </div>
+            ))}
+          </div>
+          {children.length > 10 && <div className="text-[10px] text-slate-400 mt-1">…+{children.length - 10}</div>}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ───────────────────────────────────────────────────────────────
+// DiseaseGraph: force-directed relationship view
+// ───────────────────────────────────────────────────────────────
+const GRAPH_GROUP_COLOR: Record<string, string> = {
+  primary:          '#2563eb',
+  complication:     '#e11d48',
+  comorbidity:      '#d97706',
+  synonym:          '#6b7280',
+  context_specific: '#9333ea',
+  history:          '#64748b',
+  symptom:          '#059669',
+};
+const GRAPH_EDGE_COLOR: Record<string, string> = {
+  complication: '#fb7185',
+  comorbidity:  '#fbbf24',
+  synonym:      '#9ca3af',
+  parent:       '#60a5fa',
+  default:      '#cbd5e1',
+};
+const DiseaseGraph = React.memo(({ config }: { config: any }) => {
+  const { title, nodes = [], links = [] } = config || {};
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fgRef = useRef<any>(null);
+  const [width, setWidth] = useState(600);
+  const height = 480;
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      if (w > 0) setWidth(Math.floor(w));
+    });
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, []);
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const charge = -90 - Math.min(8, nodes.length) * 10;
+    if (fg.d3Force) {
+      try { fg.d3Force('charge').strength(charge); } catch {}
+      try { fg.d3Force('link').distance(90).strength(0.6); } catch {}
+      try { fg.d3Force('center').strength(0.05); } catch {}
+    }
+    if (fg.d3ReheatSimulation) fg.d3ReheatSimulation();
+  }, [nodes.length]);
+  const nodeRadius = (n: any): number => {
+    const p = Math.max(0, Number(n.patients) || 0);
+    return 5 + Math.min(10, Math.log2(p + 1) * 2);
+  };
+  const data = {
+    nodes: nodes.map((n: any) => ({
+      ...n,
+      __r: nodeRadius(n),
+      __color: GRAPH_GROUP_COLOR[n.group || 'primary'] || GRAPH_GROUP_COLOR.primary,
+    })),
+    links: links.map((l: any) => ({
+      ...l,
+      __color: GRAPH_EDGE_COLOR[l.type || 'default'] || GRAPH_EDGE_COLOR.default,
+    })),
+  };
+  const uniqueGroups = Array.from(new Set(nodes.map((n: any) => n.group || 'primary'))) as string[];
+  return (
+    <div className="my-4 border border-slate-200 rounded-lg p-3 bg-white">
+      {title && <div className="text-sm font-semibold text-slate-800 mb-2">🌐 {title}</div>}
+      <div className="flex flex-wrap gap-3 text-[11px] text-slate-600 mb-2">
+        {uniqueGroups.map((g) => (
+          <span key={g} className="flex items-center gap-1">
+            <span className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: GRAPH_GROUP_COLOR[g] || GRAPH_GROUP_COLOR.primary }} />
+            {g}
+          </span>
+        ))}
+      </div>
+      <div ref={containerRef} className="w-full" style={{ height }}>
+        <ForceGraph2D
+          ref={fgRef}
+          graphData={data}
+          width={width}
+          height={height}
+          backgroundColor="#ffffff"
+          linkColor={(link: any) => link.__color}
+          linkWidth={1.2}
+          linkDirectionalArrowLength={3}
+          linkDirectionalArrowRelPos={0.95}
+          nodeCanvasObjectMode={() => 'replace'}
+          nodeCanvasObject={(node: any, ctx: any, scale: number) => {
+            const r = node.__r || 6;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
+            ctx.fillStyle = node.__color;
+            ctx.fill();
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.stroke();
+            const label = node.label ? `${node.id} ${node.label}` : String(node.id);
+            const fontSize = Math.max(8, 11 / Math.max(1, scale));
+            ctx.font = `${fontSize}px Sans-Serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#0f172a';
+            ctx.fillText(label, node.x, node.y + r + 2);
+          }}
+          nodePointerAreaPaint={(node: any, color: any, ctx: any) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, (node.__r || 6) + 2, 0, 2 * Math.PI, false);
+            ctx.fill();
+          }}
+          nodeLabel={(n: any) =>
+            `${n.id}${n.label ? ' - ' + n.label : ''}${n.patients != null ? ` (patients ${n.patients})` : ''}`
+          }
+          cooldownTicks={120}
+          d3VelocityDecay={0.3}
+        />
+      </div>
+    </div>
+  );
+});
+
+// Parse a JSON snippet that may represent chart / disease_tree / disease_graph.
+function tryRenderJson(text: string): React.ReactElement | null {
+  const s = text.trim();
+  if (!(s.startsWith('{"chart"') || s.startsWith('{"disease_tree"') || s.startsWith('{"disease_graph"'))) return null;
+  const attempts: string[] = [s,
+    s.replace(/\r/g, '').replace(/\n/g, ' '),
+    s.replace(/[\u0000-\u001F]+/g, ' '),
+  ];
+  for (const candidate of attempts) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed.chart) return <DataChart config={parsed.chart} />;
+      if (parsed.disease_tree) return <DiseaseTree config={parsed.disease_tree} />;
+      if (parsed.disease_graph) return <DiseaseGraph config={parsed.disease_graph} />;
+    } catch {}
+  }
+  return null;
+}
+
+function splitJsonPayloads(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const re = /\{"(chart|disease_tree|disease_graph)"\s*:[^]*?\}\s*\}/g;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    const prefix = text.slice(lastIdx, m.index);
+    if (prefix) out.push(<React.Fragment key={`t${key++}`}>{prefix}</React.Fragment>);
+    const rendered = tryRenderJson(m[0]);
+    if (rendered) out.push(<React.Fragment key={`j${key++}`}>{rendered}</React.Fragment>);
+    else out.push(<React.Fragment key={`t${key++}`}>{m[0]}</React.Fragment>);
+    lastIdx = m.index + m[0].length;
+  }
+  const tail = text.slice(lastIdx);
+  if (tail) out.push(<React.Fragment key={`t${key++}`}>{tail}</React.Fragment>);
+  return out;
+}
+
 const mdComponents = {
   code({ className, children, ...props }: any) {
     const text = String(children).trim();
-    // Detect JSON chart blocks
-    if (text.startsWith('{"chart"')) {
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed.chart) return <DataChart config={parsed.chart} />;
-      } catch {}
-    }
+    const rendered = tryRenderJson(text);
+    if (rendered) return rendered;
     // Legacy mermaid support
     const match = /language-(\w+)/.exec(className || '');
     if (match && match[1] === 'mermaid') {
       return <pre className="text-xs bg-slate-100 p-2 rounded">{text}</pre>;
     }
     return <code className={className} {...props}>{children}</code>;
-  }
+  },
+  // Defensive: agent 가 fence 를 빠뜨려 JSON 이 paragraph 안에 들어가는 케이스 처리
+  p({ children, ...props }: any) {
+    const mapped = React.Children.toArray(children).flatMap((child, i) => {
+      if (typeof child === 'string') {
+        const parts = splitJsonPayloads(child);
+        return parts.length ? parts.map((p, j) =>
+          React.isValidElement(p) ? React.cloneElement(p, { key: `p${i}-${j}` }) : p
+        ) : [child];
+      }
+      return [child];
+    });
+    const hasBlock = mapped.some((c) => React.isValidElement(c) &&
+      ((c.type as any) === DataChart || (c.type as any) === DiseaseTree || (c.type as any) === DiseaseGraph));
+    if (hasBlock) return <div className="space-y-2">{mapped}</div>;
+    return <p {...props}>{mapped}</p>;
+  },
 };
 
 const MessageBubble = React.memo(({ msg, isLast, isLoading, currentTools }: {
@@ -129,7 +375,11 @@ const MessageBubble = React.memo(({ msg, isLast, isLoading, currentTools }: {
   return true;
 });
 
-const SCENARIOS = t.scenarioItems;
+const SCENARIOS_FALLBACK = getT().scenarioItems;
+// Note: the real SCENARIOS list is read reactively inside <App/> via useLocale().
+// The fallback above only exists so any stray module-level reference (should be none)
+// still compiles. Prefer `scenarios` from the App component.
+void SCENARIOS_FALLBACK;
 
 interface ToolStep {
   name: string;
@@ -147,6 +397,8 @@ interface MessageWithTools {
 
 export default function App() {
   const { tokens, email, loading, signIn, signOut, getAccessToken, authDisabled } = useAuth();
+  const [t, locale, changeLocale] = useLocale();
+  const SCENARIOS = t.scenarioItems;
   const [messages, setMessages] = useState<MessageWithTools[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -318,6 +570,25 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Language toggle */}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium">
+            {(['ko','en'] as const).map((lng) => (
+              <button
+                key={lng}
+                type="button"
+                onClick={() => changeLocale(lng)}
+                aria-pressed={locale === lng}
+                className={cn(
+                  'px-2 py-1 rounded-md transition-colors',
+                  locale === lng
+                    ? 'bg-white text-sky-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {lng === 'ko' ? '한국어' : 'English'}
+              </button>
+            ))}
+          </div>
           {!authDisabled && <span className="text-xs text-slate-500 hidden md:block">{email}</span>}
           {!authDisabled && (
             <button

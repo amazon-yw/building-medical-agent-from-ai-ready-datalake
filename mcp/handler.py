@@ -10,6 +10,11 @@ from tools.analytics import detect_care_gaps, get_population_health_metrics
 from tools.schema_discovery import list_tables, get_table_schema, get_table_relationships
 from tools.query import run_custom_query
 from tools.pubmed import search_pubmed, get_pubmed_article
+from tools.medical_ontology import (
+    expand_disease_term,
+    get_disease_hierarchy,
+    find_related_diseases,
+)
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -30,6 +35,10 @@ TOOL_REGISTRY = {
     "run_custom_query": run_custom_query,
     "search_pubmed": search_pubmed,
     "get_pubmed_article": get_pubmed_article,
+    # Medical ontology (SNOMED / ICD-10 / complications)
+    "expand_disease_term": expand_disease_term,
+    "get_disease_hierarchy": get_disease_hierarchy,
+    "find_related_diseases": find_related_diseases,
 }
 
 

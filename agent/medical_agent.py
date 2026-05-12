@@ -127,6 +127,22 @@ _ALL_TOOL_DEFS = [
     {"name": "get_pubmed_article",
      "doc": "Fetch a specific PubMed article by PMID with full abstract.",
      "params": {"pmid": None}},
+    # Medical ontology (SNOMED + ICD-10 hybrid)
+    {"name": "expand_disease_term",
+     "doc": ("Expand a natural-language disease term or SNOMED concept_id into matched curated "
+             "anchors + discovered concept_ids + ready-to-use SQL WHERE hints against the FHIR "
+             "condition table. ALWAYS call this first whenever the user mentions a disease name, "
+             "symptom, or clinical concept, BEFORE get_diagnosis_history / run_custom_query."),
+     "params": {"query": None, "include_stats": True, "limit": 15}},
+    {"name": "get_disease_hierarchy",
+     "doc": ("Return ICD-10 chapter/block context, curated anchor info, sibling anchors in the "
+             "same ICD chapter family, and data usage stats. Use for category/family questions."),
+     "params": {"code_or_anchor": None, "include_stats": True}},
+    {"name": "find_related_diseases",
+     "doc": ("Return complications and comorbidities of a curated disease anchor. Use for "
+             "questions like 'patients with complications of diabetes' or 'comorbidities of CKD'. "
+             "relation_type: 'all' (default) | 'complications' | 'comorbidities'."),
+     "params": {"term_or_code": None, "relation_type": "all", "include_stats": True}},
 ]
 
 # Filter tools by ENABLED_TOOLS env var (comma-separated). If not set, use all.

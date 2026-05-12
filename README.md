@@ -40,25 +40,33 @@
 ├── data/
 │   ├── fhir/                     # Synthea FHIR ndjson 원본 데이터
 │   ├── ddl/                      # S3 Tables DDL 스크립트
-│   └── metadata/                 # 테이블/컬럼 메타데이터 JSON
+│   ├── metadata/                 # 테이블/컬럼 메타데이터 JSON
+│   └── ontology/
+│       └── disease_ontology.yaml # ⭐ ICD-10 chapter/block + 10 curated anchors (SNOMED)
 ├── mcp/                          # MCP 서버 (Lambda)
 │   ├── handler.py                # Lambda 진입점 — tool name 라우팅
 │   ├── emr_client.py             # EMR Serverless Livy 브릿지 (SigV4)
 │   ├── metadata_loader.py        # S3 메타데이터 로더
-│   └── tools/                    # 13개 tool 구현
+│   └── tools/                    # 18개 tool 구현
 │       ├── patient.py            # get_patient_summary, search_patients
 │       ├── clinical.py           # encounter, observation, medication, diagnosis
 │       ├── financial.py          # get_claim_summary
 │       ├── analytics.py          # detect_care_gaps, population_health_metrics
 │       ├── schema_discovery.py   # list_tables, get_table_schema, relationships
+│       ├── medical_ontology.py   # ⭐ expand_disease_term / get_disease_hierarchy / find_related_diseases
+│       ├── pubmed.py             # search_pubmed, get_pubmed_article
 │       └── query.py              # run_custom_query (Text-to-SQL)
 ├── agent/                        # AI 에이전트 + Streamlit UI
 │   ├── medical_agent.py          # Strands Agent (AgentCore Runtime 컨테이너)
 │   ├── app.py                    # Streamlit 채팅 UI (SSE 스트리밍)
-│   ├── system_prompt.md          # 에이전트 시스템 프롬프트
+│   ├── system_prompt.md          # 에이전트 시스템 프롬프트 (ontology trigger 포함)
 │   ├── scenarios.json            # 데모 시나리오 질문 목록
 │   ├── Dockerfile                # ARM64 컨테이너 (AgentCore Runtime)
 │   └── requirements.txt          # strands-agents, bedrock-agentcore, httpx
+├── react_agent/                  # React + Vite UI (chart / disease_tree / disease_graph 렌더링)
+│   └── src/
+│       ├── App.tsx               # DataChart + DiseaseTree + DiseaseGraph 컴포넌트
+│       └── i18n.ts               # 🧬 의학 온톨로지 시나리오 포함 (ko/en)
 ├── notebooks/                    # 배포 노트북 (JupyterLab)
 │   ├── 01_deploy_mcp_lambda.ipynb
 │   ├── 02_setup_agentcore_gateway.ipynb
@@ -78,7 +86,7 @@
 | 도메인 | Administrative, Clinical, Medication, Diagnostic, Care, Financial/Document |
 
 
-## MCP Tools (13)
+## MCP Tools (18)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -91,12 +99,41 @@
 | Clinical | `get_clinical_observations` | 관찰/측정 데이터 (활력징후, 검사결과) |
 | Clinical | `get_medications` | 투약 이력 (처방 + 투여 기록) |
 | Clinical | `get_diagnosis_history` | 진단 이력 (질환 + 시술) |
+| **Ontology** ⭐ | `expand_disease_term` | 자연어 질병명 / SNOMED concept_id → matched anchor + discovered concept_ids + SQL WHERE hint |
+| **Ontology** ⭐ | `get_disease_hierarchy` | ICD-10 chapter/block + 같은 챕터 형제 anchor + 사용 통계 |
+| **Ontology** ⭐ | `find_related_diseases` | 합병증·동반질환 (curated 10 anchors) |
 | Financial | `get_claim_summary` | 청구/보험 요약 |
 | Analytics | `detect_care_gaps` | 케어 갭 분석 (누락 예방접종, 미수행 검진) |
 | Analytics | `get_population_health_metrics` | 인구 건강 지표 집계 |
 | Query | `run_custom_query` | Spark SQL 직접 실행 (SELECT only, LIMIT 100) |
 | PubMed | `search_pubmed` | Pubmed 검색 |
 | PubMed | `get_pubmed_article` | Pubmed Article 조회 |
+
+### Medical Ontology Tools ⭐
+
+`mcp/tools/medical_ontology.py` 가 제공하는 세 도구는 FHIR `condition` 테이블의 **SNOMED CT concept** 과 **ICD-10 chapter/block** 을 결합해 LLM 이 질병명·관계·계층을 데이터와 연결해 해석하도록 돕습니다.
+
+| Tool | 역할 | 사용 시점 |
+|---|---|---|
+| `expand_disease_term` | 자연어 또는 SNOMED concept_id → 매칭된 anchor(snomed_codes + patterns) + 실제 발견된 concept_id 리스트 + SQL WHERE hint | 질병·증상이 포함된 질문에서 **가장 먼저 호출** |
+| `get_disease_hierarchy` | anchor / 3-digit ICD-10 → chapter / block / 형제 anchor 정보 | "카테고리 / 계열" 질문 |
+| `find_related_diseases` | anchor 의 합병증·동반질환 그룹 반환 | "complications / comorbidities of X" 질문 |
+
+데이터 원천:
+- FHIR `condition` 테이블 (Synthea 합성 데이터, SNOMED CT code + 영어 display)
+- `data/ontology/disease_ontology.yaml` — WHO ICD-10 chapter/block skeleton + **10 curated anchors** (diabetes, hypertension, CKD, IHD, cancer, respiratory, anemia, dementia, osteoarthritis, anxiety/depression) 의 SNOMED 매핑과 합병증·동반질환
+
+### 시각화 유형 (React UI)
+
+Agent 응답의 JSON 코드 블록 타입에 따라 UI 가 자동으로 차트·트리·그래프로 렌더링합니다.
+
+| Block 타입 | 컴포넌트 | 언제 쓰나 | 트리거 도구 |
+|---|---|---|---|
+| `chart` | `DataChart` (recharts) | 단순 분포 / 추이 / 비율 | `get_population_health_metrics`, `run_custom_query` 등 |
+| `disease_tree` | `DiseaseTree` | 같은 계열 내 SNOMED 코드 비교·드릴다운 | `expand_disease_term`, `get_disease_hierarchy` |
+| `disease_graph` | `DiseaseGraph` (force-directed) | 앵커-연관 질환 관계망 (합병증, 동반질환) | `find_related_diseases` |
+
+모든 JSON 블록은 반드시 ``` fence 로 감싸고 **한 줄 JSON** 이어야 합니다 (라벨 안 개행 금지).
 
 ## Workshop Labs
 
@@ -294,6 +331,29 @@ Press enter to continue to the browser or esc to cancel
 "메트포르민과 SGLT2 억제제 병용 요법에 대한 연구 결과 알려줘"
 "이 중에서 가장 관련 있는 논문 상세 내용 보여줘"
 ```
+
+### 시나리오 5: 🧬 의학 온톨로지 기반 질환 분석 (SNOMED + ICD-10)
+```
+User: Visualise diabetes together with its complications and comorbidities as a relationship graph.
+Agent:
+  1) expand_disease_term(query="diabetes")
+     → matched anchor: diabetes (E10-E14), snomed_codes [44054006, 714628002, ...]
+     → discovered concept_ids from condition table (patient counts 포함)
+  2) find_related_diseases(term_or_code="diabetes")
+     → complications: retinopathy / nephropathy / neuropathy / hyperglycemia
+     → comorbidities: hypertension / obesity
+  3) {"disease_graph":{...}} 블록 생성 → force-directed 관계망 렌더링
+
+User: Show the hierarchy of chronic kidney disease with patient counts.
+Agent:
+  1) expand_disease_term("chronic kidney disease") → anchor CKD (N17-N19)
+  2) get_disease_hierarchy("chronic_kidney_disease") → chapter/block/형제 anchor
+  3) {"disease_tree":{...}} 블록 생성 → 계층 트리 렌더링
+```
+
+지원 범위:
+- **10 curated anchor**: diabetes, hypertension, CKD, ischemic heart disease, cancer, respiratory (asthma/COPD), anemia, dementia, osteoarthritis, anxiety/depression.
+- 이 외의 질환도 `expand_disease_term` 은 `code_display` text 매칭으로 discovered concept 을 찾아 반환하지만, `find_related_diseases` 의 합병증·동반질환 관계는 anchor 에 등록된 질환만 반환합니다.
 
 ## Tech Stack
 
